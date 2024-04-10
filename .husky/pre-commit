@@ -1,0 +1,6 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+#cd web-front
+yarn lint-staged
+lizard src/ -l typescript -l javascript -C 15 -L 100 -a 3 -T nloc=100
