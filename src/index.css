@@ -68,3 +68,56 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+
+/* 印刷用スタイル */
+@media print {
+  :root {
+    color: #000000;
+    background-color: #ffffff;
+  }
+
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  body {
+    display: block;
+    min-height: auto;
+    background-color: #ffffff;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  @page {
+    size: A4 landscape;
+    margin: 10mm;
+  }
+
+  .print-section {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    margin-bottom: 20px;
+  }
+
+  .print-page-break {
+    page-break-before: always !important;
+  }
+
+  .MuiCard-root, .MuiPaper-root {
+    box-shadow: none !important;
+    border: 1px solid #ccc !important;
+  }
+
+  canvas {
+    max-width: 100% !important;
+    max-height: 250px !important;
+  }
+
+  .MuiBox-root {
+    height: auto !important;
+    overflow: visible !important;
+  }
+}
