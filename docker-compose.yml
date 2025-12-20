@@ -1,24 +1,62 @@
-version: "3.8"
 services:
-  web-front:
-    build:
-      dockerfile: Dockerfile
-#    container_name:
-    networks:
-      - app-network
-    volumes:
-      - ./:/app:cached
-      - ./node_modules:/app/node_modules
-    environment:
-      - HOST=0.0.0.0
-      - CHOKIDAR_USEPOLLING=true
-      - VITE_API_URL=http://host.docker.internal/api
-    expose:
-      - 5173
+#  web-front:
+#    build:
+#      dockerfile: Dockerfile
+##    container_name:
+#    networks:
+#      - app-network
+#    volumes:
+#      - ./:/app:cached
+#      - ./node_modules:/app/node_modules
+#    environment:
+#      - HOST=0.0.0.0
+#      - CHOKIDAR_USEPOLLING=true
+#      - VITE_API_URL=http://host.docker.internal/api
+#    expose:
+#      - 5173
+#    ports:
+#      - "5173:5173"
+#    command: npm run dev
+  sonarqube:
+    container_name: sonarqube
+    image: sonarqube:latest
+    restart: always
     ports:
-      - "5173:5173"
-    command: npm run dev
+      - "80:9000"
+    environment:
+      - SONAR_JDBC_URL=jdbc:postgresql://sonarqube-db:5432/sonar
+      - SONAR_JDBC_USERNAME=sonar
+      - SONAR_JDBC_PASSWORD=sonar
+    volumes:
+      - sonarqube-conf:/opt/sonarqube/conf
+      - sonarqube-data:/opt/sonarqube/data
+      - sonarqube-extensions:/opt/sonarqube/extensions
+    depends_on:
+      - sonarqube-db
+    networks:
+      - sonarqube
+
+  sonarqube-db:
+    container_name: sonarqube-db
+    image: postgres:16
+    restart: always
+    environment:
+      - POSTGRES_USER=sonar
+      - POSTGRES_PASSWORD=sonar
+      - POSTGRES_DB=sonar
+    volumes:
+      - postgresql-data:/var/lib/postgresql/data
+    networks:
+      - sonarqube
+
+volumes:
+  sonarqube-conf:
+  sonarqube-data:
+  sonarqube-extensions:
+  postgresql-data:
 
 networks:
+  sonarqube:
+    driver: bridge
   app-network:
     driver: bridge

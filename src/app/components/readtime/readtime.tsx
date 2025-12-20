@@ -4,7 +4,11 @@ import {Release} from "../release/release";
 import Grid from '@mui/material/Unstable_Grid2';
 import {Graph} from "../graph/graph";
 import Box from "@mui/material/Box";
-import {Button, Typography, Divider, Alert} from "@mui/material";
+import {Button, Typography, Divider, Alert, Card, CardContent, Chip, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, LinearProgress} from "@mui/material";
+import {Bar} from "react-chartjs-2";
+import {Chart, registerables} from 'chart.js';
+
+Chart.register(...registerables);
 import {ReadTimes} from "../../domain/models/read_time/read.times";
 import {Median} from "../median/median";
 import {PrSizes} from "../../domain/models/pr_size/pr_sizes";
@@ -90,19 +94,178 @@ export const Readtime = () => {
               <Alert severity="info" sx={{ mb: 2 }}>
                 <strong>測定内容:</strong> 最初のコミットからPRマージまでの時間。
                 <strong>注意:</strong> 長い（数日以上）とフィードバックが遅れ、ばらつきが大きいと見積もり精度が低下します。
-                <strong>理想:</strong> 数時間〜1日程度で安定。
+                <strong>理想:</strong> Fast/Normalカテゴリが多いほど良好。
               </Alert>
+
+              {/* サマリーカード */}
               <Grid container spacing={2}>
-                <Grid xs={5}>
-                  <Graph readTimes={read_time.values}/>
+                <Grid xs={2}>
+                  <Card>
+                    <CardContent>
+                      <Typography color="text.secondary" gutterBottom>PR数</Typography>
+                      <Typography variant="h4">{read_time.values.length}</Typography>
+                    </CardContent>
+                  </Card>
                 </Grid>
                 <Grid xs={2}>
-                  <Median readTimes={read_time}/>
+                  <Card>
+                    <CardContent>
+                      <Typography color="text.secondary" gutterBottom>中央値</Typography>
+                      <Typography variant="h4">{read_time.median() < 24 ? `${read_time.median().toFixed(1)}h` : `${(read_time.median() / 24).toFixed(1)}日`}</Typography>
+                    </CardContent>
+                  </Card>
                 </Grid>
-                <Grid xs={5}>
-                  <Release readTimes={read_time.values}/>
+                <Grid xs={2}>
+                  <Card>
+                    <CardContent>
+                      <Typography color="text.secondary" gutterBottom>平均値</Typography>
+                      <Typography variant="h4">{read_time.avg() < 24 ? `${read_time.avg().toFixed(1)}h` : `${(read_time.avg() / 24).toFixed(1)}日`}</Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+                <Grid xs={3}>
+                  <Card>
+                    <CardContent>
+                      <Typography color="text.secondary" gutterBottom>パーセンタイル</Typography>
+                      <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mb: 1 }}>
+                        <Chip label={`P50: ${read_time.p50.toFixed(1)}h`} size="small" color="success" />
+                        <Chip label={`P75: ${read_time.p75.toFixed(1)}h`} size="small" color="warning" />
+                        <Chip label={`P90: ${read_time.p90.toFixed(1)}h`} size="small" color="error" />
+                      </Box>
+                      <Typography variant="caption" color="text.secondary" component="div">
+                        P50: 半数がこの時間以内<br/>
+                        P75: 75%がこの時間以内<br/>
+                        P90: 90%がこの時間以内
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+                <Grid xs={3}>
+                  <Card>
+                    <CardContent>
+                      <Typography color="text.secondary" gutterBottom>カテゴリ内訳</Typography>
+                      {(() => {
+                        const cat = read_time.countByCategory();
+                        return (
+                          <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mb: 1 }}>
+                            <Chip label={`Fast: ${cat.Fast}`} size="small" color="success" />
+                            <Chip label={`Normal: ${cat.Normal}`} size="small" color="info" />
+                            <Chip label={`Slow: ${cat.Slow}`} size="small" color="warning" />
+                            <Chip label={`V.Slow: ${cat['Very Slow']}`} size="small" color="error" />
+                          </Box>
+                        );
+                      })()}
+                      <Typography variant="caption" color="text.secondary" component="div">
+                        Fast: &lt;4h / Normal: 4-24h<br/>
+                        Slow: 1-3日 / V.Slow: 3日+
+                      </Typography>
+                    </CardContent>
+                  </Card>
                 </Grid>
               </Grid>
+
+              {/* グラフ */}
+              <Grid container spacing={2} sx={{ mt: 1 }}>
+                <Grid xs={5}>
+                  <Paper sx={{ p: 2 }}>
+                    <Bar
+                      data={{
+                        labels: read_time.distribution().map(d => d.range),
+                        datasets: [{
+                          label: 'PR数',
+                          data: read_time.distribution().map(d => d.count),
+                          backgroundColor: read_time.distribution().map(d => d.color)
+                        }]
+                      }}
+                      options={{
+                        responsive: true,
+                        plugins: { legend: { display: false }, title: { display: true, text: 'リードタイム分布' } },
+                        scales: { y: { beginAtZero: true, title: { display: true, text: 'PR数' } } }
+                      }}
+                    />
+                  </Paper>
+                </Grid>
+                <Grid xs={7}>
+                  <Paper sx={{ p: 2 }}>
+                    <Graph readTimes={read_time.values}/>
+                  </Paper>
+                </Grid>
+              </Grid>
+
+              {/* 担当者別統計 */}
+              {read_time.statsByAuthor().length > 0 && (
+                <Grid container spacing={2} sx={{ mt: 1 }}>
+                  <Grid xs={6}>
+                    <Paper sx={{ p: 2 }}>
+                      <Bar
+                        data={{
+                          labels: read_time.statsByAuthor().map(s => s.author),
+                          datasets: [{
+                            label: '中央値（時間）',
+                            data: read_time.statsByAuthor().map(s => s.medianHours),
+                            backgroundColor: read_time.statsByAuthor().map(s => {
+                              const cat = read_time.getCategory(s.medianHours);
+                              if (cat === 'Fast') return 'rgba(76, 175, 80, 0.7)';
+                              if (cat === 'Normal') return 'rgba(33, 150, 243, 0.7)';
+                              if (cat === 'Slow') return 'rgba(255, 152, 0, 0.7)';
+                              return 'rgba(244, 67, 54, 0.7)';
+                            }),
+                            borderWidth: 1
+                          }]
+                        }}
+                        options={{
+                          indexAxis: 'y' as const,
+                          responsive: true,
+                          plugins: {
+                            legend: { display: false },
+                            title: { display: true, text: '担当者別リードタイム（中央値順）' }
+                          },
+                          scales: {
+                            x: { beginAtZero: true, title: { display: true, text: '時間' } }
+                          }
+                        }}
+                      />
+                    </Paper>
+                  </Grid>
+                  <Grid xs={6}>
+                    <Paper sx={{ p: 2 }}>
+                      <Typography variant="subtitle1" gutterBottom>詳細データ</Typography>
+                      <TableContainer sx={{ maxHeight: 250 }}>
+                        <Table size="small" stickyHeader>
+                          <TableHead>
+                            <TableRow>
+                              <TableCell>担当者</TableCell>
+                              <TableCell align="right">PR数</TableCell>
+                              <TableCell align="right">中央値</TableCell>
+                              <TableCell>評価</TableCell>
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            {read_time.statsByAuthor().map(stat => (
+                              <TableRow key={stat.author}>
+                                <TableCell>{stat.author}</TableCell>
+                                <TableCell align="right">{stat.count}</TableCell>
+                                <TableCell align="right">{stat.medianHours < 24 ? `${stat.medianHours}h` : `${(stat.medianHours / 24).toFixed(1)}日`}</TableCell>
+                                <TableCell>
+                                  <Chip
+                                    label={read_time.getCategory(stat.medianHours)}
+                                    size="small"
+                                    color={
+                                      read_time.getCategory(stat.medianHours) === 'Fast' ? 'success' :
+                                      read_time.getCategory(stat.medianHours) === 'Normal' ? 'info' :
+                                      read_time.getCategory(stat.medianHours) === 'Slow' ? 'warning' : 'error'
+                                    }
+                                  />
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </TableContainer>
+                    </Paper>
+                  </Grid>
+                </Grid>
+              )}
               <Divider sx={{ mt: 3, mb: 3 }} />
             </div>
 
