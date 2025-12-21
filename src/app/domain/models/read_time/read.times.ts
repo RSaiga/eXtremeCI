@@ -1,4 +1,5 @@
 import {ReadTime} from "./read.time";
+import { PrimitiveToken, hexToRgba } from "../../../components/ui/tokens/primitive-token";
 
 export type LeadTimeCategory = 'Fast' | 'Normal' | 'Slow' | 'Very Slow';
 
@@ -80,13 +81,13 @@ export class ReadTimes {
   // 分布データ（ヒストグラム用）
   distribution(): { range: string; count: number; color: string }[] {
     const ranges = [
-      { min: 0, max: 1, label: '< 1h', color: 'rgba(76, 175, 80, 0.8)' },
-      { min: 1, max: 4, label: '1-4h', color: 'rgba(139, 195, 74, 0.8)' },
-      { min: 4, max: 8, label: '4-8h', color: 'rgba(205, 220, 57, 0.8)' },
-      { min: 8, max: 24, label: '8-24h', color: 'rgba(255, 193, 7, 0.8)' },
-      { min: 24, max: 72, label: '1-3日', color: 'rgba(255, 152, 0, 0.8)' },
-      { min: 72, max: 168, label: '3-7日', color: 'rgba(255, 87, 34, 0.8)' },
-      { min: 168, max: Infinity, label: '7日+', color: 'rgba(244, 67, 54, 0.8)' }
+      { min: 0, max: 1, label: '< 1h', color: hexToRgba(PrimitiveToken.colors.green[50], 0.8) },
+      { min: 1, max: 4, label: '1-4h', color: hexToRgba(PrimitiveToken.colors.green[70], 0.8) },
+      { min: 4, max: 8, label: '4-8h', color: hexToRgba(PrimitiveToken.colors.yellow[70], 0.8) },
+      { min: 8, max: 24, label: '8-24h', color: hexToRgba(PrimitiveToken.colors.yellow[50], 0.8) },
+      { min: 24, max: 72, label: '1-3日', color: hexToRgba(PrimitiveToken.colors.orange[50], 0.8) },
+      { min: 72, max: 168, label: '3-7日', color: hexToRgba(PrimitiveToken.colors.orange[60], 0.8) },
+      { min: 168, max: Infinity, label: '7日+', color: hexToRgba(PrimitiveToken.colors.red[60], 0.8) }
     ];
 
     return ranges.map(r => ({

@@ -9,6 +9,7 @@ import {Button, Typography, Divider, Alert, Card, CardContent, Chip, Paper, Tabl
 import {Bar} from "react-chartjs-2";
 import {Chart, registerables} from 'chart.js';
 import {route} from "../../routes/routes";
+import { PrimitiveToken, hexToRgba } from "../ui/tokens/primitive-token";
 
 Chart.register(...registerables);
 import {ReadTimes} from "../../domain/models/read_time/read.times";
@@ -96,6 +97,14 @@ export const Readtime = () => {
                   className="no-print"
                 >
                   品質と持続性
+                </Button>
+                <Button
+                  component={Link}
+                  to={route.flowMetrics}
+                  variant="outlined"
+                  className="no-print"
+                >
+                  フロー指標
                 </Button>
                 <Button
                   variant="contained"
@@ -224,10 +233,10 @@ export const Readtime = () => {
                             data: read_time.statsByAuthor().map(s => s.medianHours),
                             backgroundColor: read_time.statsByAuthor().map(s => {
                               const cat = read_time.getCategory(s.medianHours);
-                              if (cat === 'Fast') return 'rgba(76, 175, 80, 0.7)';
-                              if (cat === 'Normal') return 'rgba(33, 150, 243, 0.7)';
-                              if (cat === 'Slow') return 'rgba(255, 152, 0, 0.7)';
-                              return 'rgba(244, 67, 54, 0.7)';
+                              if (cat === 'Fast') return hexToRgba(PrimitiveToken.colors.green[50], 0.7);
+                              if (cat === 'Normal') return hexToRgba(PrimitiveToken.colors.blue[50], 0.7);
+                              if (cat === 'Slow') return hexToRgba(PrimitiveToken.colors.orange[50], 0.7);
+                              return hexToRgba(PrimitiveToken.colors.red[60], 0.7);
                             }),
                             borderWidth: 1
                           }]

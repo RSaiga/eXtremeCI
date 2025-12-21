@@ -17,6 +17,7 @@ import {
 import Grid from '@mui/material/Unstable_Grid2';
 import {Bar, Doughnut} from "react-chartjs-2";
 import {Chart, registerables} from 'chart.js';
+import { PrimitiveToken, hexToRgba } from "../ui/tokens/primitive-token";
 
 Chart.register(...registerables);
 
@@ -32,12 +33,12 @@ export const ContributorStatsGraph: React.FC<ContributorStatsProps> = ({contribu
 
   // コミット数の円グラフ
   const pieColors = [
-    'rgba(66, 133, 244, 0.8)',   // 青
-    'rgba(52, 168, 83, 0.8)',    // 緑
-    'rgba(251, 188, 4, 0.8)',    // 黄
-    'rgba(234, 67, 53, 0.8)',    // 赤
-    'rgba(154, 160, 166, 0.8)',  // グレー
-    'rgba(171, 71, 188, 0.8)',   // 紫
+    hexToRgba(PrimitiveToken.colors.blue[60], 0.8),   // 青
+    hexToRgba(PrimitiveToken.colors.green[50], 0.8),  // 緑
+    hexToRgba(PrimitiveToken.colors.yellow[50], 0.8), // 黄
+    hexToRgba(PrimitiveToken.colors.red[60], 0.8),    // 赤
+    hexToRgba(PrimitiveToken.colors.gray[70], 0.8),   // グレー
+    hexToRgba(PrimitiveToken.colors.purple[50], 0.8), // 紫
   ];
 
   const othersCommits = totalCommits - top5.reduce((sum, s) => sum + s.commitCount, 0);
@@ -81,16 +82,16 @@ export const ContributorStatsGraph: React.FC<ContributorStatsProps> = ({contribu
       {
         label: 'コミット数',
         data: top5.map(s => s.commitCount),
-        backgroundColor: 'rgba(66, 133, 244, 0.7)',
-        borderColor: 'rgba(66, 133, 244, 1)',
+        backgroundColor: hexToRgba(PrimitiveToken.colors.blue[60], 0.7),
+        borderColor: PrimitiveToken.colors.blue[60],
         borderWidth: 1,
         yAxisID: 'y'
       },
       {
         label: 'コード量（行）',
         data: top5.map(s => s.totalChanges),
-        backgroundColor: 'rgba(52, 168, 83, 0.7)',
-        borderColor: 'rgba(52, 168, 83, 1)',
+        backgroundColor: hexToRgba(PrimitiveToken.colors.green[50], 0.7),
+        borderColor: PrimitiveToken.colors.green[50],
         borderWidth: 1,
         yAxisID: 'y1'
       }

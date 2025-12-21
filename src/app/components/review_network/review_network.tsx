@@ -18,6 +18,7 @@ import {
 import Grid from '@mui/material/Unstable_Grid2';
 import {Bar, Doughnut} from "react-chartjs-2";
 import {Chart, registerables} from 'chart.js';
+import {PrimitiveToken} from "../ui/tokens/primitive-token";
 
 Chart.register(...registerables);
 
@@ -25,14 +26,13 @@ interface ReviewNetworkGraphProps {
   reviewNetwork: ReviewNetwork;
 }
 
+// グレースケールでヒートマップ表現（白→黒）
 const getHeatmapColor = (value: number, max: number): string => {
   if (value === 0) return 'transparent';
   const intensity = Math.min(value / max, 1);
-  // 青から赤へのグラデーション
-  const r = Math.round(66 + (239 - 66) * intensity);
-  const g = Math.round(133 + (83 - 133) * intensity);
-  const b = Math.round(244 + (80 - 244) * intensity);
-  return `rgba(${r}, ${g}, ${b}, ${0.3 + intensity * 0.7})`;
+  // gray[20]からgray[100]へのグラデーション
+  const grayValue = Math.round(242 - 242 * intensity);
+  return `rgba(${grayValue}, ${grayValue}, ${grayValue}, ${0.3 + intensity * 0.7})`;
 };
 
 export const ReviewNetworkGraph: React.FC<ReviewNetworkGraphProps> = ({reviewNetwork}) => {
@@ -40,22 +40,22 @@ export const ReviewNetworkGraph: React.FC<ReviewNetworkGraphProps> = ({reviewNet
   const stats = reviewNetwork.reviewerStats;
   const maxCount = Math.max(...reviewNetwork.edges.map(e => e.weight), 1);
 
-  // レビュアー別のバーチャート
+  // レビュアー別のバーチャート（グレースケール）
   const barData = {
     labels: stats.slice(0, 10).map(s => s.name),
     datasets: [
       {
         label: 'レビュー回数',
         data: stats.slice(0, 10).map(s => s.reviewCount),
-        backgroundColor: 'rgba(66, 133, 244, 0.7)',
-        borderColor: 'rgba(66, 133, 244, 1)',
+        backgroundColor: PrimitiveToken.colors.gray[100],
+        borderColor: PrimitiveToken.colors.gray[100],
         borderWidth: 1
       },
       {
         label: 'PR作成数',
         data: stats.slice(0, 10).map(s => s.authorCount),
-        backgroundColor: 'rgba(251, 188, 4, 0.7)',
-        borderColor: 'rgba(251, 188, 4, 1)',
+        backgroundColor: PrimitiveToken.colors.gray[70],
+        borderColor: PrimitiveToken.colors.gray[80],
         borderWidth: 1
       }
     ]
@@ -99,14 +99,14 @@ export const ReviewNetworkGraph: React.FC<ReviewNetworkGraphProps> = ({reviewNet
   const topReviewerShare = topReviewers[0]?.share || 0;
   const top3Share = topReviewers.slice(0, 3).reduce((sum, r) => sum + r.share, 0);
 
-  // 負荷分散の円グラフデータ
+  // 負荷分散の円グラフデータ（グレースケール）
   const pieColors = [
-    'rgba(239, 83, 80, 0.8)',   // 赤
-    'rgba(255, 167, 38, 0.8)',  // オレンジ
-    'rgba(255, 238, 88, 0.8)',  // 黄
-    'rgba(102, 187, 106, 0.8)', // 緑
-    'rgba(66, 165, 245, 0.8)',  // 青
-    'rgba(171, 71, 188, 0.8)',  // 紫
+    PrimitiveToken.colors.gray[100],  // 黒
+    PrimitiveToken.colors.gray[80],   // ダークグレー
+    PrimitiveToken.colors.gray[70],   // グレー
+    PrimitiveToken.colors.gray[60],   // ライトグレー
+    PrimitiveToken.colors.gray[20],   // 薄いグレー
+    PrimitiveToken.colors.gray[0],    // 白（ボーダーで区別）
   ];
 
   const othersCount = totalReviews - topReviewers.reduce((sum, r) => sum + r.count, 0);
@@ -265,7 +265,7 @@ export const ReviewNetworkGraph: React.FC<ReviewNetworkGraphProps> = ({reviewNet
                 <Table size="small" stickyHeader>
                   <TableHead>
                     <TableRow>
-                      <TableCell sx={{fontWeight: 'bold', backgroundColor: '#f5f5f5'}}>
+                      <TableCell sx={{fontWeight: 'bold', backgroundColor: PrimitiveToken.colors.gray[20]}}>
                         Author ↓
                       </TableCell>
                       {matrix.reviewers.map(reviewer => (
@@ -274,7 +274,7 @@ export const ReviewNetworkGraph: React.FC<ReviewNetworkGraphProps> = ({reviewNet
                           align="center"
                           sx={{
                             fontWeight: 'bold',
-                            backgroundColor: '#f5f5f5',
+                            backgroundColor: PrimitiveToken.colors.gray[20],
                             fontSize: '0.75rem',
                             padding: '4px'
                           }}

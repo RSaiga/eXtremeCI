@@ -21,6 +21,7 @@ import {ReadTimes} from "../../domain/models/read_time/read.times";
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import TrendingDownIcon from '@mui/icons-material/TrendingDown';
 import TrendingFlatIcon from '@mui/icons-material/TrendingFlat';
+import { PrimitiveToken, hexToRgba } from "../ui/tokens/primitive-token";
 
 Chart.register(...registerables);
 
@@ -77,16 +78,16 @@ export const LeadTimeAnalysis: React.FC<LeadTimeAnalysisProps> = ({readTimes}) =
       {
         label: '中央値（時間）',
         data: weeklyTrend.map(w => w.medianHours),
-        borderColor: 'rgba(66, 133, 244, 1)',
-        backgroundColor: 'rgba(66, 133, 244, 0.2)',
+        borderColor: PrimitiveToken.colors.blue[60],
+        backgroundColor: hexToRgba(PrimitiveToken.colors.blue[60], 0.2),
         fill: true,
         tension: 0.3
       },
       {
         label: '平均値（時間）',
         data: weeklyTrend.map(w => w.avgHours),
-        borderColor: 'rgba(251, 188, 4, 1)',
-        backgroundColor: 'rgba(251, 188, 4, 0.1)',
+        borderColor: PrimitiveToken.colors.yellow[50],
+        backgroundColor: hexToRgba(PrimitiveToken.colors.yellow[50], 0.1),
         fill: false,
         tension: 0.3,
         borderDash: [5, 5]

@@ -15,6 +15,7 @@ import {
   TablePagination,
   TableRow
 } from "@mui/material";
+import { PrimitiveToken, hexToRgba } from "../ui/tokens/primitive-token";
 
 Chart.register(...registerables);
 
@@ -63,19 +64,19 @@ export const PrSizeGraph: React.FC<PrSizeGraphProps> = (props) => {
   ];
 
   const backgroundColors = [
-    'rgba(75, 192, 92, 0.6)',   // XS - green
-    'rgba(75, 192, 92, 0.6)',   // S - green
-    'rgba(255, 206, 86, 0.6)',  // M - yellow
-    'rgba(255, 99, 132, 0.6)',  // L - red
-    'rgba(255, 99, 132, 0.6)',  // XL - red
+    hexToRgba(PrimitiveToken.colors.green[60], 0.6),   // XS - green
+    hexToRgba(PrimitiveToken.colors.green[60], 0.6),   // S - green
+    hexToRgba(PrimitiveToken.colors.yellow[60], 0.6),  // M - yellow
+    hexToRgba(PrimitiveToken.colors.red[70], 0.6),     // L - red
+    hexToRgba(PrimitiveToken.colors.red[70], 0.6),     // XL - red
   ];
 
   const borderColors = [
-    'rgba(75, 192, 92, 1)',
-    'rgba(75, 192, 92, 1)',
-    'rgba(255, 206, 86, 1)',
-    'rgba(255, 99, 132, 1)',
-    'rgba(255, 99, 132, 1)',
+    PrimitiveToken.colors.green[60],
+    PrimitiveToken.colors.green[60],
+    PrimitiveToken.colors.yellow[60],
+    PrimitiveToken.colors.red[70],
+    PrimitiveToken.colors.red[70],
   ];
 
   const data = {

@@ -1,12 +1,45 @@
-:root {
-  font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
-  font-size: 16px;
-  line-height: 24px;
-  font-weight: 400;
+/**
+ * グローバルスタイル - PrimitiveToken/SemanticTokenに基づく色定義
+ *
+ * 色の定義:
+ * - gray-0: #FFFFFF (white)
+ * - gray-20: #F2F4F7 (base background)
+ * - gray-60: #D8D8D8 (light gray / table border)
+ * - gray-70: #AFAFAF (muted)
+ * - gray-80: #727272 (secondary)
+ * - gray-100: #000000 (primary / dark)
+ * - red-50: #AF4B4B (danger)
+ */
 
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+:root {
+  /* Color tokens */
+  --color-primary: #000000;
+  --color-primary-hover: #727272;
+  --color-primary-disabled: #AFAFAF;
+  --color-primary-foreground: #FFFFFF;
+  --color-secondary: #727272;
+  --color-muted: #AFAFAF;
+  --color-danger: #AF4B4B;
+
+  --color-bg-base: #F2F4F7;
+  --color-bg-white: #FFFFFF;
+  --color-bg-dark: #000000;
+  --color-bg-gray: #AFAFAF;
+  --color-bg-lightgray: #D8D8D8;
+
+  --color-border-base: #AFAFAF;
+  --color-border-input: #000000;
+  --color-border-table: #D8D8D8;
+
+  /* Typography tokens */
+  font-family: 'Hiragino Kaku Gothic Pro', 'Meiryo', sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  font-weight: 300;
+
+  color-scheme: light;
+  color: var(--color-primary);
+  background-color: var(--color-bg-base);
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -16,12 +49,12 @@
 }
 
 a {
-  font-weight: 500;
-  color: #646cff;
+  font-weight: 300;
+  color: var(--color-primary);
   text-decoration: inherit;
 }
 a:hover {
-  color: #535bf2;
+  color: var(--color-secondary);
 }
 
 body {
@@ -33,47 +66,44 @@ body {
 }
 
 h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+  font-size: 20px;
+  line-height: 1.6;
+  font-weight: 600;
 }
 
 button {
-  border-radius: 8px;
-  border: 1px solid transparent;
+  border-radius: 4px;
+  border: 1px solid var(--color-border-input);
   padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
+  font-size: 14px;
+  font-weight: 300;
   font-family: inherit;
-  background-color: #1a1a1a;
+  background-color: var(--color-bg-white);
+  color: var(--color-primary);
   cursor: pointer;
-  transition: border-color 0.25s;
+  transition: background-color 0.25s, border-color 0.25s;
 }
 button:hover {
-  border-color: #646cff;
+  background-color: var(--color-bg-base);
+  border-color: var(--color-primary-hover);
 }
 button:focus,
 button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
-
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
+button:disabled {
+  background-color: var(--color-bg-lightgray);
+  color: var(--color-primary-disabled);
+  border-color: var(--color-border-base);
+  cursor: not-allowed;
 }
 
 /* 印刷用スタイル */
 @media print {
   :root {
-    color: #000000;
-    background-color: #ffffff;
+    color: var(--color-primary);
+    background-color: var(--color-bg-white);
   }
 
   * {
@@ -84,7 +114,7 @@ button:focus-visible {
   body {
     display: block;
     min-height: auto;
-    background-color: #ffffff;
+    background-color: var(--color-bg-white);
   }
 
   .no-print {
@@ -108,7 +138,7 @@ button:focus-visible {
 
   .MuiCard-root, .MuiPaper-root {
     box-shadow: none !important;
-    border: 1px solid #ccc !important;
+    border: 1px solid var(--color-border-table) !important;
   }
 
   canvas {

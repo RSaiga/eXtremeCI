@@ -7,6 +7,7 @@ import {
 import Grid from '@mui/material/Unstable_Grid2';
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
 import { Chart, registerables } from 'chart.js';
+import { PrimitiveToken, hexToRgba } from '../ui/tokens/primitive-token';
 
 Chart.register(...registerables);
 
@@ -286,7 +287,7 @@ export const QualitySustainabilityDashboard: React.FC = () => {
                     metrics.ciMetrics.failedChecks,
                     metrics.ciMetrics.totalChecks - metrics.ciMetrics.successfulChecks - metrics.ciMetrics.failedChecks,
                   ],
-                  backgroundColor: ['#4CAF50', '#F44336', '#9E9E9E'],
+                  backgroundColor: [PrimitiveToken.colors.gray[100], PrimitiveToken.colors.red[50], PrimitiveToken.colors.gray[70]],
                   borderWidth: 2,
                 }],
               }}
@@ -366,7 +367,7 @@ export const QualitySustainabilityDashboard: React.FC = () => {
                     metrics.refactoringMetrics.refactoringPrs,
                     metrics.refactoringMetrics.otherPrs,
                   ],
-                  backgroundColor: ['#2196F3', '#FF9800', '#9C27B0', '#9E9E9E'],
+                  backgroundColor: [PrimitiveToken.colors.gray[100], PrimitiveToken.colors.gray[80], PrimitiveToken.colors.gray[60], PrimitiveToken.colors.gray[70]],
                 }],
               }}
               options={{
@@ -438,8 +439,8 @@ export const QualitySustainabilityDashboard: React.FC = () => {
                 {
                   label: 'リファクタリング率 (%)',
                   data: metrics.refactoringMetrics.weeklyTrend.map(w => w.refactoringRate * 100),
-                  borderColor: '#9C27B0',
-                  backgroundColor: 'rgba(156, 39, 176, 0.2)',
+                  borderColor: PrimitiveToken.colors.gray[80],
+                  backgroundColor: hexToRgba(PrimitiveToken.colors.gray[80], 0.2),
                   fill: true,
                   tension: 0.3,
                 },

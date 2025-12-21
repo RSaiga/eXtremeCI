@@ -17,6 +17,7 @@ import {
   Typography
 } from "@mui/material";
 import Grid from '@mui/material/Unstable_Grid2';
+import { PrimitiveToken, hexToRgba } from "../ui/tokens/primitive-token";
 
 interface OpenPrListProps {
   openPrs: OpenPr[];
@@ -150,8 +151,8 @@ export const OpenPrList: React.FC<OpenPrListProps> = (props) => {
                     key={pr.prNumber}
                     sx={{
                       '&:last-child td, &:last-child th': {border: 0},
-                      backgroundColor: pr.isOld ? 'rgba(255, 0, 0, 0.05)' :
-                                       pr.isStale ? 'rgba(255, 165, 0, 0.05)' : 'inherit'
+                      backgroundColor: pr.isOld ? hexToRgba(PrimitiveToken.colors.red[60], 0.05) :
+                                       pr.isStale ? hexToRgba(PrimitiveToken.colors.orange[50], 0.05) : 'inherit'
                     }}
                   >
                     <TableCell>{pr.prNumber}</TableCell>

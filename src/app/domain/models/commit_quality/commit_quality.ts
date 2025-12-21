@@ -1,5 +1,7 @@
 // コミット質分析のドメインモデル
 
+import { PrimitiveToken } from '../../../components/ui/tokens/primitive-token';
+
 export interface CommitSizeCategory {
   name: 'XS' | 'S' | 'M' | 'L' | 'XL';
   label: string;
@@ -10,11 +12,11 @@ export interface CommitSizeCategory {
 }
 
 export const COMMIT_SIZE_CATEGORIES: CommitSizeCategory[] = [
-  { name: 'XS', label: '極小 (1-10行)', min: 1, max: 10, color: '#4CAF50', description: '理想的：ピンポイント修正' },
-  { name: 'S', label: '小 (11-50行)', min: 11, max: 50, color: '#8BC34A', description: '良好：レビューしやすい' },
-  { name: 'M', label: '中 (51-150行)', min: 51, max: 150, color: '#FFC107', description: '許容範囲：注意が必要' },
-  { name: 'L', label: '大 (151-400行)', min: 151, max: 400, color: '#FF9800', description: '要注意：分割を検討' },
-  { name: 'XL', label: '巨大 (401行+)', min: 401, max: Infinity, color: '#F44336', description: '問題：レビュー困難' },
+  { name: 'XS', label: '極小 (1-10行)', min: 1, max: 10, color: PrimitiveToken.colors.gray[100], description: '理想的：ピンポイント修正' },
+  { name: 'S', label: '小 (11-50行)', min: 11, max: 50, color: PrimitiveToken.colors.gray[80], description: '良好：レビューしやすい' },
+  { name: 'M', label: '中 (51-150行)', min: 51, max: 150, color: PrimitiveToken.colors.gray[70], description: '許容範囲：注意が必要' },
+  { name: 'L', label: '大 (151-400行)', min: 151, max: 400, color: PrimitiveToken.colors.gray[60], description: '要注意：分割を検討' },
+  { name: 'XL', label: '巨大 (401行+)', min: 401, max: Infinity, color: PrimitiveToken.colors.red[50], description: '問題：レビュー困難' },
 ];
 
 export interface CommitQualityMetrics {

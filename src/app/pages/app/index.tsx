@@ -1,17 +1,12 @@
 import { BrowserRouter } from 'react-router-dom'
 import { AppRoutes } from '../../routes/app'
-import {createTheme, ThemeProvider} from "@mui/material";
+import { ThemeProvider } from "@mui/material";
 import React from "react";
+import { appTheme } from '../../components/ui/theme/mui-theme'
 
 export function App() {
-  const darkTheme = createTheme({
-    palette: {
-      mode: 'light',
-    },
-  });
-
   return (
-    <ThemeProvider theme={darkTheme}>
+    <ThemeProvider theme={appTheme}>
       <BrowserRouter>
         <AppRoutes />
       </BrowserRouter>

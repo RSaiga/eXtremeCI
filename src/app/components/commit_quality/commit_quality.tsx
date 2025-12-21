@@ -7,6 +7,7 @@ import {
 import Grid from '@mui/material/Unstable_Grid2';
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
 import { Chart, registerables } from 'chart.js';
+import { PrimitiveToken, hexToRgba } from '../ui/tokens/primitive-token';
 
 Chart.register(...registerables);
 
@@ -215,11 +216,11 @@ export const CommitQualityDashboard: React.FC<CommitQualityDashboardProps> = ({
                     metrics.largeCommitRatio * 100,
                   ],
                   backgroundColor: [
-                    metrics.smallCommitRatio >= 0.7 ? '#4CAF50' : metrics.smallCommitRatio >= 0.5 ? '#FFC107' : '#F44336',
-                    metrics.largeCommitRatio <= 0.1 ? '#4CAF50' : metrics.largeCommitRatio <= 0.2 ? '#FFC107' : '#F44336',
+                    metrics.smallCommitRatio >= 0.7 ? PrimitiveToken.colors.gray[100] : metrics.smallCommitRatio >= 0.5 ? PrimitiveToken.colors.gray[70] : PrimitiveToken.colors.red[50],
+                    metrics.largeCommitRatio <= 0.1 ? PrimitiveToken.colors.gray[100] : metrics.largeCommitRatio <= 0.2 ? PrimitiveToken.colors.gray[70] : PrimitiveToken.colors.red[50],
                   ],
                   borderWidth: 2,
-                  borderColor: ['#2E7D32', '#C62828'],
+                  borderColor: [PrimitiveToken.colors.gray[100], PrimitiveToken.colors.gray[80]],
                 }],
               }}
               options={{
@@ -368,16 +369,16 @@ export const CommitQualityDashboard: React.FC<CommitQualityDashboardProps> = ({
                 {
                   label: '刻み型 (XS+S) %',
                   data: metrics.weeklyTrend.map(w => w.smallRatio * 100),
-                  borderColor: '#4CAF50',
-                  backgroundColor: 'rgba(76, 175, 80, 0.2)',
+                  borderColor: PrimitiveToken.colors.gray[100],
+                  backgroundColor: hexToRgba(PrimitiveToken.colors.gray[100], 0.1),
                   fill: true,
                   tension: 0.3,
                 },
                 {
                   label: 'まとめ型 (L+XL) %',
                   data: metrics.weeklyTrend.map(w => w.largeRatio * 100),
-                  borderColor: '#F44336',
-                  backgroundColor: 'rgba(244, 67, 54, 0.2)',
+                  borderColor: PrimitiveToken.colors.red[50],
+                  backgroundColor: hexToRgba(PrimitiveToken.colors.red[50], 0.2),
                   fill: true,
                   tension: 0.3,
                 },
@@ -417,12 +418,12 @@ export const CommitQualityDashboard: React.FC<CommitQualityDashboardProps> = ({
                     {
                       label: '刻み型 (XS+S) %',
                       data: authorStats.slice(0, 10).map(a => a.smallCommitRatio * 100),
-                      backgroundColor: 'rgba(76, 175, 80, 0.7)',
+                      backgroundColor: PrimitiveToken.colors.gray[100],
                     },
                     {
                       label: 'まとめ型 (L+XL) %',
                       data: authorStats.slice(0, 10).map(a => a.largeCommitRatio * 100),
-                      backgroundColor: 'rgba(244, 67, 54, 0.7)',
+                      backgroundColor: PrimitiveToken.colors.red[50],
                     },
                   ],
                 }}

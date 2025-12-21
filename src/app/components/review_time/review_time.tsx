@@ -19,6 +19,7 @@ import {
   Typography
 } from "@mui/material";
 import Grid from '@mui/material/Unstable_Grid2';
+import { PrimitiveToken, hexToRgba } from "../ui/tokens/primitive-token";
 
 Chart.register(...registerables);
 
@@ -68,14 +69,14 @@ export const ReviewTimeGraph: React.FC<ReviewTimeGraphProps> = (props) => {
       label: '平均応答時間 (時間)',
       data: reviewerStats.map(s => s.avgResponseTimeHours),
       backgroundColor: reviewerStats.map(s =>
-        s.avgResponseTimeHours <= 4 ? 'rgba(75, 192, 92, 0.6)' :
-        s.avgResponseTimeHours <= 24 ? 'rgba(255, 206, 86, 0.6)' :
-        'rgba(255, 99, 132, 0.6)'
+        s.avgResponseTimeHours <= 4 ? hexToRgba(PrimitiveToken.colors.green[60], 0.6) :
+        s.avgResponseTimeHours <= 24 ? hexToRgba(PrimitiveToken.colors.yellow[60], 0.6) :
+        hexToRgba(PrimitiveToken.colors.red[70], 0.6)
       ),
       borderColor: reviewerStats.map(s =>
-        s.avgResponseTimeHours <= 4 ? 'rgba(75, 192, 92, 1)' :
-        s.avgResponseTimeHours <= 24 ? 'rgba(255, 206, 86, 1)' :
-        'rgba(255, 99, 132, 1)'
+        s.avgResponseTimeHours <= 4 ? PrimitiveToken.colors.green[60] :
+        s.avgResponseTimeHours <= 24 ? PrimitiveToken.colors.yellow[60] :
+        PrimitiveToken.colors.red[70]
       ),
       borderWidth: 1,
     }]
