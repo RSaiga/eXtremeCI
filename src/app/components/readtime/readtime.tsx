@@ -1,4 +1,5 @@
 import React, {useEffect, useState} from "react";
+import {Link} from "react-router-dom";
 import Loading from "../loading/loading";
 import {Release} from "../release/release";
 import Grid from '@mui/material/Unstable_Grid2';
@@ -7,6 +8,7 @@ import Box from "@mui/material/Box";
 import {Button, Typography, Divider, Alert, Card, CardContent, Chip, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, LinearProgress} from "@mui/material";
 import {Bar} from "react-chartjs-2";
 import {Chart, registerables} from 'chart.js';
+import {route} from "../../routes/routes";
 
 Chart.register(...registerables);
 import {ReadTimes} from "../../domain/models/read_time/read.times";
@@ -78,14 +80,31 @@ export const Readtime = () => {
                   {repoName} - {today}（過去90日間）
                 </Typography>
               </Box>
-              <Button
-                variant="contained"
-                onClick={handlePrint}
-                className="no-print"
-                sx={{ height: 'fit-content' }}
-              >
-                PDF出力 / 印刷
-              </Button>
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <Button
+                  component={Link}
+                  to={route.commitQuality}
+                  variant="outlined"
+                  className="no-print"
+                >
+                  コミット品質分析
+                </Button>
+                <Button
+                  component={Link}
+                  to={route.qualitySustainability}
+                  variant="outlined"
+                  className="no-print"
+                >
+                  品質と持続性
+                </Button>
+                <Button
+                  variant="contained"
+                  onClick={handlePrint}
+                  className="no-print"
+                >
+                  PDF出力 / 印刷
+                </Button>
+              </Box>
             </Box>
 
             {/* 1. リードタイム */}

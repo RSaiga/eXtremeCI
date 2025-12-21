@@ -16,6 +16,9 @@ export interface PrDetailData {
   changed_files: number;
   firstCommitDate: Date | null;
   reviews: ReviewData[];
+  labels: string[];
+  files: string[];
+  ciStatus: 'success' | 'failure' | 'pending' | 'unknown';
 }
 
 export interface ReviewData {
@@ -42,10 +45,18 @@ query($owner: String!, $repo: String!, $closedCursor: String, $openCursor: Strin
         additions
         deletions
         changedFiles
+        labels(first: 10) {
+          nodes {
+            name
+          }
+        }
         commits(first: 1) {
           nodes {
             commit {
               committedDate
+              statusCheckRollup {
+                state
+              }
             }
           }
         }
@@ -73,6 +84,20 @@ query($owner: String!, $repo: String!, $closedCursor: String, $openCursor: Strin
         additions
         deletions
         changedFiles
+        labels(first: 10) {
+          nodes {
+            name
+          }
+        }
+        commits(last: 1) {
+          nodes {
+            commit {
+              statusCheckRollup {
+                state
+              }
+            }
+          }
+        }
         reviews(first: 10) {
           nodes {
             author { login }
@@ -100,10 +125,18 @@ interface GraphQLPrNode {
   additions: number;
   deletions: number;
   changedFiles: number;
+  labels: {
+    nodes: Array<{
+      name: string;
+    }>;
+  };
   commits?: {
     nodes: Array<{
       commit: {
-        committedDate: string;
+        committedDate?: string;
+        statusCheckRollup?: {
+          state: 'SUCCESS' | 'FAILURE' | 'PENDING' | 'ERROR' | 'EXPECTED';
+        } | null;
       };
     }>;
   };
@@ -127,7 +160,26 @@ interface GraphQLResponse {
   };
 }
 
+function mapCiStatus(state?: string | null): 'success' | 'failure' | 'pending' | 'unknown' {
+  if (!state) return 'unknown';
+  switch (state) {
+    case 'SUCCESS':
+    case 'EXPECTED':
+      return 'success';
+    case 'FAILURE':
+    case 'ERROR':
+      return 'failure';
+    case 'PENDING':
+      return 'pending';
+    default:
+      return 'unknown';
+  }
+}
+
 function transformPrNode(node: GraphQLPrNode): PrDetailData {
+  const lastCommit = node.commits?.nodes?.[node.commits.nodes.length - 1];
+  const firstCommit = node.commits?.nodes?.[0];
+
   return {
     number: node.number,
     title: node.title,
@@ -142,14 +194,17 @@ function transformPrNode(node: GraphQLPrNode): PrDetailData {
     additions: node.additions,
     deletions: node.deletions,
     changed_files: node.changedFiles,
-    firstCommitDate: node.commits?.nodes?.[0]?.commit?.committedDate
-      ? new Date(node.commits.nodes[0].commit.committedDate)
+    firstCommitDate: firstCommit?.commit?.committedDate
+      ? new Date(firstCommit.commit.committedDate)
       : null,
     reviews: node.reviews.nodes.map(r => ({
       user: r.author ? { login: r.author.login } : null,
       state: r.state,
       submitted_at: r.submittedAt
-    }))
+    })),
+    labels: node.labels.nodes.map(l => l.name),
+    files: [], // ファイル一覧はREST APIで別途取得が必要
+    ciStatus: mapCiStatus(lastCommit?.commit?.statusCheckRollup?.state)
   };
 }
 
