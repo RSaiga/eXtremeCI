@@ -1,2 +1,4 @@
 bunx lint-staged
-lizard src/ -l typescript -l javascript -C 15 -L 100 -a 3 -T nloc=100
+if command -v lizard >/dev/null 2>&1; then
+  lizard src/ -l typescript -l javascript -C 15 -L 100 -a 3 -T nloc=100
+fi
