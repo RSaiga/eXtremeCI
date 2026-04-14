@@ -1,78 +1,102 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react'
 import {
-  Box, Card, CardContent, Typography, Chip, Paper,
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  LinearProgress, Alert,
-} from '@mui/material';
-import Grid from '@mui/material/Unstable_Grid2';
-import { Bar, Doughnut, Line } from 'react-chartjs-2';
-import { Chart, registerables } from 'chart.js';
-import { PrimitiveToken, hexToRgba } from '../ui/tokens/primitive-token';
+  Box,
+  Card,
+  CardContent,
+  Typography,
+  Chip,
+  Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  LinearProgress,
+  Alert,
+} from '@mui/material'
+import Grid from '@mui/material/Unstable_Grid2'
+import { Bar, Doughnut, Line } from 'react-chartjs-2'
+import { Chart, registerables } from 'chart.js'
+import { PrimitiveToken, hexToRgba } from '../ui/tokens/primitive-token'
 
-Chart.register(...registerables);
+Chart.register(...registerables)
 
-import {
-  QualitySustainabilityMetrics,
-} from '../../domain/models/quality_sustainability/quality_sustainability';
-import {
-  analyzeQualitySustainability,
-} from '../../domain/services/quality_sustainability/quality_sustainability_service';
-import Loading from '../loading/loading';
+import { QualitySustainabilityMetrics } from '../../domain/models/quality_sustainability/quality_sustainability'
+import { analyzeQualitySustainability } from '../../domain/services/quality_sustainability/quality_sustainability_service'
+import Loading from '../loading/loading'
+import { useActiveRepo } from '../../shared/repos/context'
 
 export const QualitySustainabilityDashboard: React.FC = () => {
-  const [metrics, setMetrics] = useState<QualitySustainabilityMetrics | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const { activeRepo, selectedRepos } = useActiveRepo()
+  const [metrics, setMetrics] = useState<QualitySustainabilityMetrics | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    loadData();
-  }, []);
+    loadData()
+  }, [activeRepo])
 
   const loadData = async () => {
-    setIsLoading(true);
+    setIsLoading(true)
     try {
-      const data = await analyzeQualitySustainability();
-      setMetrics(data);
+      const data = await analyzeQualitySustainability(selectedRepos)
+      setMetrics(data)
     } catch (e) {
-      console.error('Failed to load quality sustainability data:', e);
+      console.error('Failed to load quality sustainability data:', e)
     }
-    setIsLoading(false);
-  };
+    setIsLoading(false)
+  }
 
   if (isLoading) {
-    return <Loading />;
+    return <Loading />
   }
 
   if (!metrics) {
-    return <Alert severity="warning">データを取得できませんでした</Alert>;
+    return <Alert severity="warning">データを取得できませんでした</Alert>
   }
 
   const getGradeColor = (grade: string) => {
     switch (grade) {
-      case 'A': return 'success';
-      case 'B': return 'info';
-      case 'C': return 'warning';
+      case 'A':
+        return 'success'
+      case 'B':
+        return 'info'
+      case 'C':
+        return 'warning'
       case 'D':
-      case 'F': return 'error';
-      default: return 'default';
+      case 'F':
+        return 'error'
+      default:
+        return 'default'
     }
-  };
+  }
 
   const getOrientationColor = (orientation: string) => {
     switch (orientation) {
-      case 'long-term': return 'success';
-      case 'short-term': return 'error';
-      default: return 'warning';
+      case 'long-term':
+        return 'success'
+      case 'short-term':
+        return 'error'
+      default:
+        return 'warning'
     }
-  };
+  }
 
   return (
     <Box>
       {/* 1. 総合判定 - 短期成果 vs 長期保守 */}
-      <Paper sx={{
-        p: 3, mb: 3,
-        bgcolor: metrics.orientation === 'long-term' ? 'success.light' :
-                 metrics.orientation === 'short-term' ? 'error.light' : 'warning.light'
-      }}>
+      <Paper
+        sx={{
+          p: 3,
+          mb: 3,
+          bgcolor:
+            metrics.orientation === 'long-term'
+              ? 'success.light'
+              : metrics.orientation === 'short-term'
+                ? 'error.light'
+                : 'warning.light',
+        }}
+      >
         <Grid container spacing={2} alignItems="center">
           <Grid xs={12} md={8}>
             <Typography variant="h5" sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -89,25 +113,43 @@ export const QualitySustainabilityDashboard: React.FC = () => {
             <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
               <Chip
                 label={`テスト文化: ${metrics.testMetrics.testCultureLabel}`}
-                color={metrics.testMetrics.testCulture === 'strong' ? 'success' :
-                       metrics.testMetrics.testCulture === 'moderate' ? 'warning' : 'error'}
+                color={
+                  metrics.testMetrics.testCulture === 'strong'
+                    ? 'success'
+                    : metrics.testMetrics.testCulture === 'moderate'
+                      ? 'warning'
+                      : 'error'
+                }
               />
               <Chip
                 label={`CI健全性: ${metrics.ciMetrics.ciHealthLabel}`}
-                color={metrics.ciMetrics.ciHealth === 'excellent' ? 'success' :
-                       metrics.ciMetrics.ciHealth === 'good' ? 'info' :
-                       metrics.ciMetrics.ciHealth === 'needs-improvement' ? 'warning' : 'error'}
+                color={
+                  metrics.ciMetrics.ciHealth === 'excellent'
+                    ? 'success'
+                    : metrics.ciMetrics.ciHealth === 'good'
+                      ? 'info'
+                      : metrics.ciMetrics.ciHealth === 'needs-improvement'
+                        ? 'warning'
+                        : 'error'
+                }
               />
               <Chip
                 label={`技術的負債: ${metrics.refactoringMetrics.techDebtAttitudeLabel}`}
-                color={metrics.refactoringMetrics.techDebtAttitude === 'proactive' ? 'success' :
-                       metrics.refactoringMetrics.techDebtAttitude === 'reactive' ? 'warning' : 'error'}
+                color={
+                  metrics.refactoringMetrics.techDebtAttitude === 'proactive'
+                    ? 'success'
+                    : metrics.refactoringMetrics.techDebtAttitude === 'reactive'
+                      ? 'warning'
+                      : 'error'
+                }
               />
             </Box>
           </Grid>
           <Grid xs={12} md={4}>
             <Box sx={{ textAlign: 'center' }}>
-              <Typography variant="caption" color="text.secondary">持続性スコア</Typography>
+              <Typography variant="caption" color="text.secondary">
+                持続性スコア
+              </Typography>
               <Typography variant="h1" color={getOrientationColor(metrics.orientation) + '.dark'}>
                 {metrics.sustainabilityGrade}
               </Typography>
@@ -121,16 +163,28 @@ export const QualitySustainabilityDashboard: React.FC = () => {
 
       {/* 2. 評価基準 */}
       <Paper sx={{ p: 2, mb: 3 }}>
-        <Typography variant="h6" sx={{ mb: 2 }}>評価基準と現状</Typography>
+        <Typography variant="h6" sx={{ mb: 2 }}>
+          評価基準と現状
+        </Typography>
         <TableContainer>
           <Table size="small">
             <TableHead>
               <TableRow sx={{ bgcolor: 'grey.100' }}>
-                <TableCell><strong>指標</strong></TableCell>
-                <TableCell align="center"><strong>現状</strong></TableCell>
-                <TableCell align="center"><strong>目標</strong></TableCell>
-                <TableCell align="center"><strong>評価</strong></TableCell>
-                <TableCell><strong>読み取れること</strong></TableCell>
+                <TableCell>
+                  <strong>指標</strong>
+                </TableCell>
+                <TableCell align="center">
+                  <strong>現状</strong>
+                </TableCell>
+                <TableCell align="center">
+                  <strong>目標</strong>
+                </TableCell>
+                <TableCell align="center">
+                  <strong>評価</strong>
+                </TableCell>
+                <TableCell>
+                  <strong>読み取れること</strong>
+                </TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -142,11 +196,21 @@ export const QualitySustainabilityDashboard: React.FC = () => {
                 <TableCell align="center">70%以上</TableCell>
                 <TableCell align="center">
                   <Chip
-                    label={metrics.testMetrics.testInclusionRate >= 0.7 ? '良好' :
-                           metrics.testMetrics.testInclusionRate >= 0.4 ? '要改善' : '問題'}
+                    label={
+                      metrics.testMetrics.testInclusionRate >= 0.7
+                        ? '良好'
+                        : metrics.testMetrics.testInclusionRate >= 0.4
+                          ? '要改善'
+                          : '問題'
+                    }
                     size="small"
-                    color={metrics.testMetrics.testInclusionRate >= 0.7 ? 'success' :
-                           metrics.testMetrics.testInclusionRate >= 0.4 ? 'warning' : 'error'}
+                    color={
+                      metrics.testMetrics.testInclusionRate >= 0.7
+                        ? 'success'
+                        : metrics.testMetrics.testInclusionRate >= 0.4
+                          ? 'warning'
+                          : 'error'
+                    }
                   />
                 </TableCell>
                 <TableCell>テストを書く文化があるか</TableCell>
@@ -159,11 +223,21 @@ export const QualitySustainabilityDashboard: React.FC = () => {
                 <TableCell align="center">90%以上</TableCell>
                 <TableCell align="center">
                   <Chip
-                    label={metrics.ciMetrics.successRate >= 0.9 ? '優秀' :
-                           metrics.ciMetrics.successRate >= 0.75 ? '良好' : '要改善'}
+                    label={
+                      metrics.ciMetrics.successRate >= 0.9
+                        ? '優秀'
+                        : metrics.ciMetrics.successRate >= 0.75
+                          ? '良好'
+                          : '要改善'
+                    }
                     size="small"
-                    color={metrics.ciMetrics.successRate >= 0.9 ? 'success' :
-                           metrics.ciMetrics.successRate >= 0.75 ? 'info' : 'warning'}
+                    color={
+                      metrics.ciMetrics.successRate >= 0.9
+                        ? 'success'
+                        : metrics.ciMetrics.successRate >= 0.75
+                          ? 'info'
+                          : 'warning'
+                    }
                   />
                 </TableCell>
                 <TableCell>コードの品質管理ができているか</TableCell>
@@ -176,11 +250,21 @@ export const QualitySustainabilityDashboard: React.FC = () => {
                 <TableCell align="center">10-20%</TableCell>
                 <TableCell align="center">
                   <Chip
-                    label={metrics.refactoringMetrics.refactoringRate >= 0.1 ? '良好' :
-                           metrics.refactoringMetrics.refactoringRate >= 0.05 ? '普通' : '少ない'}
+                    label={
+                      metrics.refactoringMetrics.refactoringRate >= 0.1
+                        ? '良好'
+                        : metrics.refactoringMetrics.refactoringRate >= 0.05
+                          ? '普通'
+                          : '少ない'
+                    }
                     size="small"
-                    color={metrics.refactoringMetrics.refactoringRate >= 0.1 ? 'success' :
-                           metrics.refactoringMetrics.refactoringRate >= 0.05 ? 'warning' : 'error'}
+                    color={
+                      metrics.refactoringMetrics.refactoringRate >= 0.1
+                        ? 'success'
+                        : metrics.refactoringMetrics.refactoringRate >= 0.05
+                          ? 'warning'
+                          : 'error'
+                    }
                   />
                 </TableCell>
                 <TableCell>技術的負債に向き合っているか</TableCell>
@@ -192,7 +276,9 @@ export const QualitySustainabilityDashboard: React.FC = () => {
 
       {/* 3. テストコードの分析 */}
       <Paper sx={{ p: 2, mb: 3 }}>
-        <Typography variant="h6" sx={{ mb: 2 }}>テストコードの有無・増え方</Typography>
+        <Typography variant="h6" sx={{ mb: 2 }}>
+          テストコードの有無・増え方
+        </Typography>
         <Grid container spacing={2}>
           <Grid xs={12} md={4}>
             <Card variant="outlined">
@@ -200,25 +286,32 @@ export const QualitySustainabilityDashboard: React.FC = () => {
                 <Typography variant="subtitle2" color="text.secondary">
                   PRにテストが含まれる割合
                 </Typography>
-                <Typography variant="h3" color={
-                  metrics.testMetrics.testInclusionRate >= 0.7 ? 'success.main' :
-                  metrics.testMetrics.testInclusionRate >= 0.4 ? 'warning.main' : 'error.main'
-                }>
+                <Typography
+                  variant="h3"
+                  color={
+                    metrics.testMetrics.testInclusionRate >= 0.7
+                      ? 'success.main'
+                      : metrics.testMetrics.testInclusionRate >= 0.4
+                        ? 'warning.main'
+                        : 'error.main'
+                  }
+                >
                   {(metrics.testMetrics.testInclusionRate * 100).toFixed(0)}%
                 </Typography>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
-                  <Typography variant="caption">
-                    テストあり: {metrics.testMetrics.prsWithTests}件
-                  </Typography>
-                  <Typography variant="caption">
-                    テストなし: {metrics.testMetrics.prsWithoutTests}件
-                  </Typography>
+                  <Typography variant="caption">テストあり: {metrics.testMetrics.prsWithTests}件</Typography>
+                  <Typography variant="caption">テストなし: {metrics.testMetrics.prsWithoutTests}件</Typography>
                 </Box>
                 <LinearProgress
                   variant="determinate"
                   value={metrics.testMetrics.testInclusionRate * 100}
-                  color={metrics.testMetrics.testInclusionRate >= 0.7 ? 'success' :
-                         metrics.testMetrics.testInclusionRate >= 0.4 ? 'warning' : 'error'}
+                  color={
+                    metrics.testMetrics.testInclusionRate >= 0.7
+                      ? 'success'
+                      : metrics.testMetrics.testInclusionRate >= 0.4
+                        ? 'warning'
+                        : 'error'
+                  }
                   sx={{ mt: 1 }}
                 />
               </CardContent>
@@ -230,25 +323,32 @@ export const QualitySustainabilityDashboard: React.FC = () => {
                 <Typography variant="subtitle2" color="text.secondary">
                   テストを書く開発者の割合
                 </Typography>
-                <Typography variant="h3" color={
-                  metrics.testMetrics.authorTestRate >= 0.7 ? 'success.main' :
-                  metrics.testMetrics.authorTestRate >= 0.4 ? 'warning.main' : 'error.main'
-                }>
+                <Typography
+                  variant="h3"
+                  color={
+                    metrics.testMetrics.authorTestRate >= 0.7
+                      ? 'success.main'
+                      : metrics.testMetrics.authorTestRate >= 0.4
+                        ? 'warning.main'
+                        : 'error.main'
+                  }
+                >
                   {(metrics.testMetrics.authorTestRate * 100).toFixed(0)}%
                 </Typography>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
-                  <Typography variant="caption">
-                    書く人: {metrics.testMetrics.authorsWithTests}人
-                  </Typography>
-                  <Typography variant="caption">
-                    書かない人: {metrics.testMetrics.authorsWithoutTests}人
-                  </Typography>
+                  <Typography variant="caption">書く人: {metrics.testMetrics.authorsWithTests}人</Typography>
+                  <Typography variant="caption">書かない人: {metrics.testMetrics.authorsWithoutTests}人</Typography>
                 </Box>
                 <LinearProgress
                   variant="determinate"
                   value={metrics.testMetrics.authorTestRate * 100}
-                  color={metrics.testMetrics.authorTestRate >= 0.7 ? 'success' :
-                         metrics.testMetrics.authorTestRate >= 0.4 ? 'warning' : 'error'}
+                  color={
+                    metrics.testMetrics.authorTestRate >= 0.7
+                      ? 'success'
+                      : metrics.testMetrics.authorTestRate >= 0.4
+                        ? 'warning'
+                        : 'error'
+                  }
                   sx={{ mt: 1 }}
                 />
               </CardContent>
@@ -257,7 +357,9 @@ export const QualitySustainabilityDashboard: React.FC = () => {
           <Grid xs={12} md={4}>
             <Card variant="outlined">
               <CardContent>
-                <Typography variant="subtitle2" color="text.secondary">テスト文化の評価</Typography>
+                <Typography variant="subtitle2" color="text.secondary">
+                  テスト文化の評価
+                </Typography>
                 <Typography variant="h4" sx={{ mt: 1 }}>
                   {metrics.testMetrics.testCultureLabel}
                 </Typography>
@@ -275,21 +377,31 @@ export const QualitySustainabilityDashboard: React.FC = () => {
 
       {/* 4. CI分析 */}
       <Paper sx={{ p: 2, mb: 3 }}>
-        <Typography variant="h6" sx={{ mb: 2 }}>CIの失敗頻度</Typography>
+        <Typography variant="h6" sx={{ mb: 2 }}>
+          CIの失敗頻度
+        </Typography>
         <Grid container spacing={2}>
           <Grid xs={12} md={6}>
             <Doughnut
               data={{
                 labels: ['成功', '失敗', 'その他'],
-                datasets: [{
-                  data: [
-                    metrics.ciMetrics.successfulChecks,
-                    metrics.ciMetrics.failedChecks,
-                    metrics.ciMetrics.totalChecks - metrics.ciMetrics.successfulChecks - metrics.ciMetrics.failedChecks,
-                  ],
-                  backgroundColor: [PrimitiveToken.colors.gray[100], PrimitiveToken.colors.red[50], PrimitiveToken.colors.gray[70]],
-                  borderWidth: 2,
-                }],
+                datasets: [
+                  {
+                    data: [
+                      metrics.ciMetrics.successfulChecks,
+                      metrics.ciMetrics.failedChecks,
+                      metrics.ciMetrics.totalChecks -
+                        metrics.ciMetrics.successfulChecks -
+                        metrics.ciMetrics.failedChecks,
+                    ],
+                    backgroundColor: [
+                      PrimitiveToken.colors.gray[100],
+                      PrimitiveToken.colors.red[50],
+                      PrimitiveToken.colors.gray[70],
+                    ],
+                    borderWidth: 2,
+                  },
+                ],
               }}
               options={{
                 responsive: true,
@@ -302,12 +414,16 @@ export const QualitySustainabilityDashboard: React.FC = () => {
           </Grid>
           <Grid xs={12} md={6}>
             <Box sx={{ p: 2 }}>
-              <Typography variant="subtitle1" gutterBottom>CI健全性指標</Typography>
+              <Typography variant="subtitle1" gutterBottom>
+                CI健全性指標
+              </Typography>
               <Table size="small">
                 <TableBody>
                   <TableRow>
                     <TableCell>総チェック数</TableCell>
-                    <TableCell align="right"><strong>{metrics.ciMetrics.totalChecks}</strong></TableCell>
+                    <TableCell align="right">
+                      <strong>{metrics.ciMetrics.totalChecks}</strong>
+                    </TableCell>
                   </TableRow>
                   <TableRow>
                     <TableCell>成功</TableCell>
@@ -326,25 +442,34 @@ export const QualitySustainabilityDashboard: React.FC = () => {
                     <TableCell align="right">
                       <Chip
                         label={`${(metrics.ciMetrics.successRate * 100).toFixed(0)}%`}
-                        color={metrics.ciMetrics.successRate >= 0.9 ? 'success' :
-                               metrics.ciMetrics.successRate >= 0.75 ? 'info' : 'warning'}
+                        color={
+                          metrics.ciMetrics.successRate >= 0.9
+                            ? 'success'
+                            : metrics.ciMetrics.successRate >= 0.75
+                              ? 'info'
+                              : 'warning'
+                        }
                       />
                     </TableCell>
                   </TableRow>
                 </TableBody>
               </Table>
-              <Alert severity={
-                metrics.ciMetrics.ciHealth === 'excellent' ? 'success' :
-                metrics.ciMetrics.ciHealth === 'good' ? 'info' : 'warning'
-              } sx={{ mt: 2 }}>
+              <Alert
+                severity={
+                  metrics.ciMetrics.ciHealth === 'excellent'
+                    ? 'success'
+                    : metrics.ciMetrics.ciHealth === 'good'
+                      ? 'info'
+                      : 'warning'
+                }
+                sx={{ mt: 2 }}
+              >
                 {metrics.ciMetrics.ciHealth === 'excellent' &&
                   'CIが安定しており、コードの品質管理が適切に機能しています。'}
-                {metrics.ciMetrics.ciHealth === 'good' &&
-                  'CIは概ね安定していますが、失敗率を下げる余地があります。'}
+                {metrics.ciMetrics.ciHealth === 'good' && 'CIは概ね安定していますが、失敗率を下げる余地があります。'}
                 {metrics.ciMetrics.ciHealth === 'needs-improvement' &&
                   'CIの失敗が多く、開発効率に影響しています。テストの安定化が必要です。'}
-                {metrics.ciMetrics.ciHealth === 'critical' &&
-                  'CIの失敗率が高すぎます。テスト環境の見直しが急務です。'}
+                {metrics.ciMetrics.ciHealth === 'critical' && 'CIの失敗率が高すぎます。テスト環境の見直しが急務です。'}
               </Alert>
             </Box>
           </Grid>
@@ -353,22 +478,31 @@ export const QualitySustainabilityDashboard: React.FC = () => {
 
       {/* 5. リファクタリング分析 */}
       <Paper sx={{ p: 2, mb: 3 }}>
-        <Typography variant="h6" sx={{ mb: 2 }}>リファクタリング系PRの存在</Typography>
+        <Typography variant="h6" sx={{ mb: 2 }}>
+          リファクタリング系PRの存在
+        </Typography>
         <Grid container spacing={2}>
           <Grid xs={12} md={6}>
             <Bar
               data={{
                 labels: ['機能追加', 'バグ修正', 'リファクタリング', 'その他'],
-                datasets: [{
-                  label: 'PR数',
-                  data: [
-                    metrics.refactoringMetrics.featurePrs,
-                    metrics.refactoringMetrics.bugfixPrs,
-                    metrics.refactoringMetrics.refactoringPrs,
-                    metrics.refactoringMetrics.otherPrs,
-                  ],
-                  backgroundColor: [PrimitiveToken.colors.gray[100], PrimitiveToken.colors.gray[80], PrimitiveToken.colors.gray[60], PrimitiveToken.colors.gray[70]],
-                }],
+                datasets: [
+                  {
+                    label: 'PR数',
+                    data: [
+                      metrics.refactoringMetrics.featurePrs,
+                      metrics.refactoringMetrics.bugfixPrs,
+                      metrics.refactoringMetrics.refactoringPrs,
+                      metrics.refactoringMetrics.otherPrs,
+                    ],
+                    backgroundColor: [
+                      PrimitiveToken.colors.gray[100],
+                      PrimitiveToken.colors.gray[80],
+                      PrimitiveToken.colors.gray[60],
+                      PrimitiveToken.colors.gray[70],
+                    ],
+                  },
+                ],
               }}
               options={{
                 responsive: true,
@@ -384,12 +518,20 @@ export const QualitySustainabilityDashboard: React.FC = () => {
           </Grid>
           <Grid xs={12} md={6}>
             <Box sx={{ p: 2 }}>
-              <Typography variant="subtitle1" gutterBottom>技術的負債への向き合い方</Typography>
+              <Typography variant="subtitle1" gutterBottom>
+                技術的負債への向き合い方
+              </Typography>
               <Box sx={{ mb: 2 }}>
-                <Typography variant="h4" color={
-                  metrics.refactoringMetrics.techDebtAttitude === 'proactive' ? 'success.main' :
-                  metrics.refactoringMetrics.techDebtAttitude === 'reactive' ? 'warning.main' : 'error.main'
-                }>
+                <Typography
+                  variant="h4"
+                  color={
+                    metrics.refactoringMetrics.techDebtAttitude === 'proactive'
+                      ? 'success.main'
+                      : metrics.refactoringMetrics.techDebtAttitude === 'reactive'
+                        ? 'warning.main'
+                        : 'error.main'
+                  }
+                >
                   {metrics.refactoringMetrics.techDebtAttitudeLabel}
                 </Typography>
               </Box>
@@ -398,24 +540,34 @@ export const QualitySustainabilityDashboard: React.FC = () => {
                   <TableRow>
                     <TableCell>リファクタリングPR</TableCell>
                     <TableCell align="right">
-                      <strong>{metrics.refactoringMetrics.refactoringPrs}</strong> 件
-                      ({(metrics.refactoringMetrics.refactoringRate * 100).toFixed(0)}%)
+                      <strong>{metrics.refactoringMetrics.refactoringPrs}</strong> 件 (
+                      {(metrics.refactoringMetrics.refactoringRate * 100).toFixed(0)}%)
                     </TableCell>
                   </TableRow>
                   <TableRow>
                     <TableCell>機能追加PR</TableCell>
-                    <TableCell align="right"><strong>{metrics.refactoringMetrics.featurePrs}</strong> 件</TableCell>
+                    <TableCell align="right">
+                      <strong>{metrics.refactoringMetrics.featurePrs}</strong> 件
+                    </TableCell>
                   </TableRow>
                   <TableRow>
                     <TableCell>バグ修正PR</TableCell>
-                    <TableCell align="right"><strong>{metrics.refactoringMetrics.bugfixPrs}</strong> 件</TableCell>
+                    <TableCell align="right">
+                      <strong>{metrics.refactoringMetrics.bugfixPrs}</strong> 件
+                    </TableCell>
                   </TableRow>
                 </TableBody>
               </Table>
-              <Alert severity={
-                metrics.refactoringMetrics.techDebtAttitude === 'proactive' ? 'success' :
-                metrics.refactoringMetrics.techDebtAttitude === 'reactive' ? 'warning' : 'error'
-              } sx={{ mt: 2 }}>
+              <Alert
+                severity={
+                  metrics.refactoringMetrics.techDebtAttitude === 'proactive'
+                    ? 'success'
+                    : metrics.refactoringMetrics.techDebtAttitude === 'reactive'
+                      ? 'warning'
+                      : 'error'
+                }
+                sx={{ mt: 2 }}
+              >
                 {metrics.refactoringMetrics.techDebtAttitude === 'proactive' &&
                   '定期的にリファクタリングを行い、技術的負債を返済しています。'}
                 {metrics.refactoringMetrics.techDebtAttitude === 'reactive' &&
@@ -431,14 +583,16 @@ export const QualitySustainabilityDashboard: React.FC = () => {
       {/* 6. 週次トレンド */}
       {metrics.refactoringMetrics.weeklyTrend.length > 1 && (
         <Paper sx={{ p: 2, mb: 3 }}>
-          <Typography variant="h6" sx={{ mb: 2 }}>週次トレンド - 品質への投資は続いているか？</Typography>
+          <Typography variant="h6" sx={{ mb: 2 }}>
+            週次トレンド - 品質への投資は続いているか？
+          </Typography>
           <Line
             data={{
-              labels: metrics.refactoringMetrics.weeklyTrend.map(w => w.weekLabel),
+              labels: metrics.refactoringMetrics.weeklyTrend.map((w) => w.weekLabel),
               datasets: [
                 {
                   label: 'リファクタリング率 (%)',
-                  data: metrics.refactoringMetrics.weeklyTrend.map(w => w.refactoringRate * 100),
+                  data: metrics.refactoringMetrics.weeklyTrend.map((w) => w.refactoringRate * 100),
                   borderColor: PrimitiveToken.colors.gray[80],
                   backgroundColor: hexToRgba(PrimitiveToken.colors.gray[80], 0.2),
                   fill: true,
@@ -470,7 +624,9 @@ export const QualitySustainabilityDashboard: React.FC = () => {
 
       {/* 7. 診断結果と改善アクション */}
       <Paper sx={{ p: 2 }}>
-        <Typography variant="h6" sx={{ mb: 2 }}>診断結果と改善アクション</Typography>
+        <Typography variant="h6" sx={{ mb: 2 }}>
+          診断結果と改善アクション
+        </Typography>
 
         {metrics.orientation === 'long-term' && (
           <Alert severity="success" sx={{ mb: 2 }}>
@@ -485,7 +641,9 @@ export const QualitySustainabilityDashboard: React.FC = () => {
               <strong>問題:</strong> 短期的な機能開発を優先し、テストやリファクタリングへの投資が少ない状態です。
               このままでは技術的負債が蓄積し、将来的に開発速度が低下するリスクがあります。
             </Alert>
-            <Typography variant="subtitle2" sx={{ mb: 1 }}>改善アクション:</Typography>
+            <Typography variant="subtitle2" sx={{ mb: 1 }}>
+              改善アクション:
+            </Typography>
             <Box component="ul" sx={{ pl: 2 }}>
               <li>新機能にはテストを必須にする（レビューでチェック）</li>
               <li>週に1つはリファクタリングPRを出すルールを作る</li>
@@ -501,7 +659,9 @@ export const QualitySustainabilityDashboard: React.FC = () => {
               <strong>改善余地あり:</strong> テストとリファクタリングのバランスは取れていますが、
               さらなる改善で長期的な保守性を高められます。
             </Alert>
-            <Typography variant="subtitle2" sx={{ mb: 1 }}>改善のヒント:</Typography>
+            <Typography variant="subtitle2" sx={{ mb: 1 }}>
+              改善のヒント:
+            </Typography>
             <Box component="ul" sx={{ pl: 2 }}>
               <li>テストカバレッジの目標を設定する</li>
               <li>リファクタリングのタイミングをスプリントに組み込む</li>
@@ -511,7 +671,9 @@ export const QualitySustainabilityDashboard: React.FC = () => {
         )}
 
         <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.100', borderRadius: 1 }}>
-          <Typography variant="subtitle2" sx={{ mb: 1 }}>なぜ長期保守重視が重要か？</Typography>
+          <Typography variant="subtitle2" sx={{ mb: 1 }}>
+            なぜ長期保守重視が重要か？
+          </Typography>
           <Grid container spacing={2}>
             <Grid xs={12} md={4}>
               <Typography variant="body2">
@@ -532,5 +694,5 @@ export const QualitySustainabilityDashboard: React.FC = () => {
         </Box>
       </Paper>
     </Box>
-  );
-};
+  )
+}

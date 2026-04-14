@@ -1,21 +1,21 @@
-import React from "react";
-import Box from "@mui/material/Box";
-import { Typography, Button, Alert } from "@mui/material";
-import { Link } from "react-router-dom";
-import { QualitySustainabilityDashboard } from "../../components/quality_sustainability/quality_sustainability";
+import React from 'react'
+import Box from '@mui/material/Box'
+import { Typography, Button, Alert } from '@mui/material'
+import { Link } from 'react-router-dom'
+import { QualitySustainabilityDashboard } from '../../components/quality_sustainability/quality_sustainability'
 
 export const QualitySustainabilityPage = () => {
   const handlePrint = () => {
-    window.print();
-  };
+    window.print()
+  }
 
   const today = new Date().toLocaleDateString('ja-JP', {
     year: 'numeric',
     month: 'long',
-    day: 'numeric'
-  });
+    day: 'numeric',
+  })
 
-  const repoName = import.meta.env.VITE_GITHUB_REPO || 'Unknown Repository';
+  const repoName = import.meta.env.VITE_GITHUB_REPO || 'Unknown Repository'
 
   return (
     <Box component="section" sx={{ p: 3 }}>
@@ -30,19 +30,10 @@ export const QualitySustainabilityPage = () => {
           </Typography>
         </Box>
         <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button
-            component={Link}
-            to="/"
-            variant="outlined"
-            className="no-print"
-          >
+          <Button component={Link} to="/" variant="outlined" className="no-print">
             ダッシュボードに戻る
           </Button>
-          <Button
-            variant="contained"
-            onClick={handlePrint}
-            className="no-print"
-          >
+          <Button variant="contained" onClick={handlePrint} className="no-print">
             PDF出力 / 印刷
           </Button>
         </Box>
@@ -58,5 +49,5 @@ export const QualitySustainabilityPage = () => {
       {/* メインコンテンツ */}
       <QualitySustainabilityDashboard />
     </Box>
-  );
-};
+  )
+}

@@ -1,5 +1,5 @@
-import {Commiters} from "../../models/commiter/commiters";
+import { Commiters } from '../../models/commiter/commiters'
 
 export interface CommiterRepository {
-  find(): Promise<Commiters>;
+  find(owner: string, repo: string): Promise<Commiters>
 }

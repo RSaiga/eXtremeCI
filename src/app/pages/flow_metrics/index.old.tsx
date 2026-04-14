@@ -1,21 +1,21 @@
-import React from "react";
-import Box from "@mui/material/Box";
-import { Typography, Button, Alert } from "@mui/material";
-import { Link } from "react-router-dom";
-import { FlowMetricsDashboard } from "../../components/flow_metrics/flow_metrics";
+import React from 'react'
+import Box from '@mui/material/Box'
+import { Typography, Button, Alert } from '@mui/material'
+import { Link } from 'react-router-dom'
+import { FlowMetricsDashboard } from '../../components/flow_metrics/flow_metrics'
 
 export const FlowMetricsPage = () => {
   const handlePrint = () => {
-    window.print();
-  };
+    window.print()
+  }
 
   const today = new Date().toLocaleDateString('ja-JP', {
     year: 'numeric',
     month: 'long',
-    day: 'numeric'
-  });
+    day: 'numeric',
+  })
 
-  const repoName = import.meta.env.VITE_GITHUB_REPO || 'Unknown Repository';
+  const repoName = import.meta.env.VITE_GITHUB_REPO || 'Unknown Repository'
 
   return (
     <Box component="section" sx={{ p: 3 }}>
@@ -30,19 +30,10 @@ export const FlowMetricsPage = () => {
           </Typography>
         </Box>
         <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button
-            component={Link}
-            to="/"
-            variant="outlined"
-            className="no-print"
-          >
+          <Button component={Link} to="/" variant="outlined" className="no-print">
             ダッシュボードに戻る
           </Button>
-          <Button
-            variant="contained"
-            onClick={handlePrint}
-            className="no-print"
-          >
+          <Button variant="contained" onClick={handlePrint} className="no-print">
             PDF出力 / 印刷
           </Button>
         </Box>
@@ -54,11 +45,12 @@ export const FlowMetricsPage = () => {
         <br />
         <strong>主な指標:</strong> サイクルタイム（PR作成〜マージ）、レビュー待ち時間、修正往復回数、PRサイズ
         <br />
-        <strong>目的:</strong> ボトルネックが「人」「設計」「個人作業」「チーム作業」のどこにあるかを特定し、改善につなげる。
+        <strong>目的:</strong>{' '}
+        ボトルネックが「人」「設計」「個人作業」「チーム作業」のどこにあるかを特定し、改善につなげる。
       </Alert>
 
       {/* メインコンテンツ */}
       <FlowMetricsDashboard />
     </Box>
-  );
-};
+  )
+}

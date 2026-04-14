@@ -1,15 +1,27 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react'
 import {
-  Box, Card, CardContent, Typography, Chip, Paper,
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  LinearProgress, Alert, Tooltip
-} from '@mui/material';
-import Grid from '@mui/material/Unstable_Grid2';
-import { Bar, Doughnut, Line } from 'react-chartjs-2';
-import { Chart, registerables } from 'chart.js';
-import { PrimitiveToken, hexToRgba } from '../ui/tokens/primitive-token';
+  Box,
+  Card,
+  CardContent,
+  Typography,
+  Chip,
+  Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  LinearProgress,
+  Alert,
+  Tooltip,
+} from '@mui/material'
+import Grid from '@mui/material/Unstable_Grid2'
+import { Bar, Doughnut, Line } from 'react-chartjs-2'
+import { Chart, registerables } from 'chart.js'
+import { PrimitiveToken, hexToRgba } from '../ui/tokens/primitive-token'
 
-Chart.register(...registerables);
+Chart.register(...registerables)
 
 import {
   FlowMetricsSummary,
@@ -17,103 +29,110 @@ import {
   ReviewerResponseMetrics,
   WeeklyFlowTrend,
   BottleneckAnalysis,
-} from '../../domain/models/flow_metrics/flow_metrics';
-import {
-  FlowMetricsService,
-  FlowMetricsData,
-} from '../../domain/services/flow_metrics/flow_metrics_service';
-import Loading from '../loading/loading';
+} from '../../domain/models/flow_metrics/flow_metrics'
+import { FlowMetricsService, FlowMetricsData } from '../../domain/services/flow_metrics/flow_metrics_service'
+import Loading from '../loading/loading'
+import { useActiveRepo } from '../../shared/repos/context'
 
 interface FlowMetricsDashboardProps {
-  externalData?: FlowMetricsData;
+  externalData?: FlowMetricsData
 }
 
-export const FlowMetricsDashboard: React.FC<FlowMetricsDashboardProps> = ({
-  externalData,
-}) => {
-  const [data, setData] = useState<FlowMetricsData | null>(externalData || null);
-  const [isLoading, setIsLoading] = useState(!externalData);
+export const FlowMetricsDashboard: React.FC<FlowMetricsDashboardProps> = ({ externalData }) => {
+  const { activeRepo, selectedRepos } = useActiveRepo()
+  const [data, setData] = useState<FlowMetricsData | null>(externalData || null)
+  const [isLoading, setIsLoading] = useState(!externalData)
 
   useEffect(() => {
     if (!externalData) {
-      loadData();
+      loadData()
     }
-  }, [externalData]);
+  }, [externalData, activeRepo])
 
   const loadData = async () => {
-    setIsLoading(true);
+    setIsLoading(true)
     try {
-      const result = await FlowMetricsService.fetchAll();
-      setData(result);
+      const result = await FlowMetricsService.fetchAll(selectedRepos)
+      setData(result)
     } catch (e) {
-      console.error('Failed to load flow metrics:', e);
+      console.error('Failed to load flow metrics:', e)
     }
-    setIsLoading(false);
-  };
+    setIsLoading(false)
+  }
 
   if (isLoading) {
-    return <Loading />;
+    return <Loading />
   }
 
   if (!data) {
-    return <Alert severity="warning">フロー指標データを取得できませんでした</Alert>;
+    return <Alert severity="warning">フロー指標データを取得できませんでした</Alert>
   }
 
-  const { summary, authorMetrics, reviewerMetrics, weeklyTrend, bottlenecks } = data;
+  const { summary, authorMetrics, reviewerMetrics, weeklyTrend, bottlenecks } = data
 
   const formatHours = (hours: number): string => {
-    if (hours < 1) return `${Math.round(hours * 60)}分`;
-    if (hours < 24) return `${hours.toFixed(1)}時間`;
-    return `${(hours / 24).toFixed(1)}日`;
-  };
+    if (hours < 1) return `${Math.round(hours * 60)}分`
+    if (hours < 24) return `${hours.toFixed(1)}時間`
+    return `${(hours / 24).toFixed(1)}日`
+  }
 
   const getHealthColor = (ratio: number): 'success' | 'warning' | 'error' => {
-    if (ratio >= 0.7) return 'success';
-    if (ratio >= 0.4) return 'warning';
-    return 'error';
-  };
+    if (ratio >= 0.7) return 'success'
+    if (ratio >= 0.4) return 'warning'
+    return 'error'
+  }
 
   const getCycleTimeColor = (hours: number): 'success' | 'warning' | 'error' => {
-    if (hours <= 24) return 'success';
-    if (hours <= 72) return 'warning';
-    return 'error';
-  };
+    if (hours <= 24) return 'success'
+    if (hours <= 72) return 'warning'
+    return 'error'
+  }
 
   const getWaitTimeColor = (hours: number): 'success' | 'warning' | 'error' => {
-    if (hours <= 4) return 'success';
-    if (hours <= 24) return 'warning';
-    return 'error';
-  };
+    if (hours <= 4) return 'success'
+    if (hours <= 24) return 'warning'
+    return 'error'
+  }
 
   const getRevisionColor = (rounds: number): 'success' | 'warning' | 'error' => {
-    if (rounds <= 1) return 'success';
-    if (rounds <= 2) return 'warning';
-    return 'error';
-  };
+    if (rounds <= 1) return 'success'
+    if (rounds <= 2) return 'warning'
+    return 'error'
+  }
 
   const getBottleneckIcon = (type: BottleneckAnalysis['type']): string => {
     switch (type) {
-      case 'individual': return '👤';
-      case 'design': return '📐';
-      case 'team': return '👥';
-      case 'process': return '⚙️';
+      case 'individual':
+        return '👤'
+      case 'design':
+        return '📐'
+      case 'team':
+        return '👥'
+      case 'process':
+        return '⚙️'
     }
-  };
+  }
 
   const getBottleneckLabel = (type: BottleneckAnalysis['type']): string => {
     switch (type) {
-      case 'individual': return '個人作業';
-      case 'design': return '設計';
-      case 'team': return 'チーム';
-      case 'process': return 'プロセス';
+      case 'individual':
+        return '個人作業'
+      case 'design':
+        return '設計'
+      case 'team':
+        return 'チーム'
+      case 'process':
+        return 'プロセス'
     }
-  };
+  }
 
   return (
     <Box>
       {/* 1. DORA フロー指標サマリー */}
       <Paper sx={{ p: 3, mb: 3, bgcolor: 'grey.50' }}>
-        <Typography variant="h5" sx={{ mb: 3 }}>DORA フロー指標サマリー</Typography>
+        <Typography variant="h5" sx={{ mb: 3 }}>
+          DORA フロー指標サマリー
+        </Typography>
         <Grid container spacing={3}>
           <Grid xs={12} sm={6} md={3}>
             <Card sx={{ height: '100%' }}>
@@ -193,9 +212,7 @@ export const FlowMetricsDashboard: React.FC<FlowMetricsDashboardProps> = ({
                 <Typography variant="subtitle2" color="text.secondary">
                   平均レビュー回数
                 </Typography>
-                <Typography variant="h4">
-                  {summary.avgReviewCount.toFixed(1)}回
-                </Typography>
+                <Typography variant="h4">{summary.avgReviewCount.toFixed(1)}回</Typography>
                 <Typography variant="caption" color="text.secondary">
                   レビュアー数: {summary.avgUniqueReviewers.toFixed(1)}人
                 </Typography>
@@ -212,7 +229,9 @@ export const FlowMetricsDashboard: React.FC<FlowMetricsDashboardProps> = ({
 
       {/* 2. 健全性指標 */}
       <Paper sx={{ p: 3, mb: 3 }}>
-        <Typography variant="h6" sx={{ mb: 2 }}>フィードバックループの健全性</Typography>
+        <Typography variant="h6" sx={{ mb: 2 }}>
+          フィードバックループの健全性
+        </Typography>
         <Grid container spacing={3}>
           <Grid xs={12} md={4}>
             <Box sx={{ textAlign: 'center', p: 2 }}>
@@ -226,7 +245,9 @@ export const FlowMetricsDashboard: React.FC<FlowMetricsDashboardProps> = ({
                 4時間以内にレビュー開始
               </Typography>
               <Chip
-                label={summary.fastFeedbackRatio >= 0.7 ? '良好' : summary.fastFeedbackRatio >= 0.4 ? '改善余地' : '要改善'}
+                label={
+                  summary.fastFeedbackRatio >= 0.7 ? '良好' : summary.fastFeedbackRatio >= 0.4 ? '改善余地' : '要改善'
+                }
                 color={getHealthColor(summary.fastFeedbackRatio)}
                 size="small"
                 sx={{ mt: 1 }}
@@ -264,7 +285,9 @@ export const FlowMetricsDashboard: React.FC<FlowMetricsDashboardProps> = ({
                 修正依頼1回以下
               </Typography>
               <Chip
-                label={summary.lowRevisionRatio >= 0.7 ? '良好' : summary.lowRevisionRatio >= 0.4 ? '改善余地' : '要改善'}
+                label={
+                  summary.lowRevisionRatio >= 0.7 ? '良好' : summary.lowRevisionRatio >= 0.4 ? '改善余地' : '要改善'
+                }
                 color={getHealthColor(summary.lowRevisionRatio)}
                 size="small"
                 sx={{ mt: 1 }}
@@ -281,20 +304,20 @@ export const FlowMetricsDashboard: React.FC<FlowMetricsDashboardProps> = ({
       {/* 3. ボトルネック分析 */}
       {bottlenecks.length > 0 && (
         <Paper sx={{ p: 3, mb: 3 }}>
-          <Typography variant="h6" sx={{ mb: 2 }}>ボトルネック分析</Typography>
+          <Typography variant="h6" sx={{ mb: 2 }}>
+            ボトルネック分析
+          </Typography>
           <Grid container spacing={2}>
             {bottlenecks.map((bottleneck, idx) => (
               <Grid xs={12} md={6} key={idx}>
                 <Alert
-                  severity={bottleneck.severity === 'high' ? 'error' : bottleneck.severity === 'medium' ? 'warning' : 'info'}
+                  severity={
+                    bottleneck.severity === 'high' ? 'error' : bottleneck.severity === 'medium' ? 'warning' : 'info'
+                  }
                   icon={<span style={{ fontSize: '1.5em' }}>{getBottleneckIcon(bottleneck.type)}</span>}
                 >
-                  <Typography variant="subtitle2">
-                    {getBottleneckLabel(bottleneck.type)}の問題
-                  </Typography>
-                  <Typography variant="body2">
-                    {bottleneck.description}
-                  </Typography>
+                  <Typography variant="subtitle2">{getBottleneckLabel(bottleneck.type)}の問題</Typography>
+                  <Typography variant="body2">{bottleneck.description}</Typography>
                   <Typography variant="caption" color="text.secondary">
                     影響PR: {bottleneck.affectedPRs.length}件
                   </Typography>
@@ -309,21 +332,25 @@ export const FlowMetricsDashboard: React.FC<FlowMetricsDashboardProps> = ({
       <Grid container spacing={2} sx={{ mb: 3 }}>
         <Grid xs={12} md={6}>
           <Paper sx={{ p: 2, height: '100%' }}>
-            <Typography variant="h6" sx={{ mb: 2 }}>PRサイズ分布</Typography>
+            <Typography variant="h6" sx={{ mb: 2 }}>
+              PRサイズ分布
+            </Typography>
             <Doughnut
               data={{
-                labels: summary.sizeDistribution.map(d => `${d.category} (${d.count}件)`),
-                datasets: [{
-                  data: summary.sizeDistribution.map(d => d.count),
-                  backgroundColor: [
-                    PrimitiveToken.colors.gray[100],
-                    PrimitiveToken.colors.gray[80],
-                    PrimitiveToken.colors.gray[60],
-                    PrimitiveToken.colors.gray[20],
-                    PrimitiveToken.colors.red[50],
-                  ],
-                  borderWidth: 2,
-                }],
+                labels: summary.sizeDistribution.map((d) => `${d.category} (${d.count}件)`),
+                datasets: [
+                  {
+                    data: summary.sizeDistribution.map((d) => d.count),
+                    backgroundColor: [
+                      PrimitiveToken.colors.gray[100],
+                      PrimitiveToken.colors.gray[80],
+                      PrimitiveToken.colors.gray[60],
+                      PrimitiveToken.colors.gray[20],
+                      PrimitiveToken.colors.red[50],
+                    ],
+                    borderWidth: 2,
+                  },
+                ],
               }}
               options={{
                 responsive: true,
@@ -332,8 +359,8 @@ export const FlowMetricsDashboard: React.FC<FlowMetricsDashboardProps> = ({
                   tooltip: {
                     callbacks: {
                       label: (ctx) => {
-                        const item = summary.sizeDistribution[ctx.dataIndex];
-                        return `${item.count}件 (${item.percentage.toFixed(1)}%)`;
+                        const item = summary.sizeDistribution[ctx.dataIndex]
+                        return `${item.count}件 (${item.percentage.toFixed(1)}%)`
                       },
                     },
                   },
@@ -349,32 +376,46 @@ export const FlowMetricsDashboard: React.FC<FlowMetricsDashboardProps> = ({
         </Grid>
         <Grid xs={12} md={6}>
           <Paper sx={{ p: 2, height: '100%' }}>
-            <Typography variant="h6" sx={{ mb: 2 }}>統計詳細</Typography>
+            <Typography variant="h6" sx={{ mb: 2 }}>
+              統計詳細
+            </Typography>
             <TableContainer>
               <Table size="small">
                 <TableBody>
                   <TableRow>
-                    <TableCell><strong>総PR数</strong></TableCell>
+                    <TableCell>
+                      <strong>総PR数</strong>
+                    </TableCell>
                     <TableCell align="right">{summary.totalPRs}件</TableCell>
                   </TableRow>
                   <TableRow>
-                    <TableCell><strong>マージ済みPR数</strong></TableCell>
+                    <TableCell>
+                      <strong>マージ済みPR数</strong>
+                    </TableCell>
                     <TableCell align="right">{summary.mergedPRs}件</TableCell>
                   </TableRow>
                   <TableRow>
-                    <TableCell><strong>平均サイクルタイム</strong></TableCell>
+                    <TableCell>
+                      <strong>平均サイクルタイム</strong>
+                    </TableCell>
                     <TableCell align="right">{formatHours(summary.avgCycleTimeHours)}</TableCell>
                   </TableRow>
                   <TableRow>
-                    <TableCell><strong>P90サイクルタイム</strong></TableCell>
+                    <TableCell>
+                      <strong>P90サイクルタイム</strong>
+                    </TableCell>
                     <TableCell align="right">{formatHours(summary.p90CycleTimeHours)}</TableCell>
                   </TableRow>
                   <TableRow>
-                    <TableCell><strong>平均レビュー待ち時間</strong></TableCell>
+                    <TableCell>
+                      <strong>平均レビュー待ち時間</strong>
+                    </TableCell>
                     <TableCell align="right">{formatHours(summary.avgFirstReviewWaitHours)}</TableCell>
                   </TableRow>
                   <TableRow>
-                    <TableCell><strong>P90レビュー待ち時間</strong></TableCell>
+                    <TableCell>
+                      <strong>P90レビュー待ち時間</strong>
+                    </TableCell>
                     <TableCell align="right">{formatHours(summary.p90FirstReviewWaitHours)}</TableCell>
                   </TableRow>
                 </TableBody>
@@ -387,14 +428,16 @@ export const FlowMetricsDashboard: React.FC<FlowMetricsDashboardProps> = ({
       {/* 5. 週次トレンド */}
       {weeklyTrend.length > 1 && (
         <Paper sx={{ p: 2, mb: 3 }}>
-          <Typography variant="h6" sx={{ mb: 2 }}>週次トレンド</Typography>
+          <Typography variant="h6" sx={{ mb: 2 }}>
+            週次トレンド
+          </Typography>
           <Line
             data={{
-              labels: weeklyTrend.map(w => w.weekLabel),
+              labels: weeklyTrend.map((w) => w.weekLabel),
               datasets: [
                 {
                   label: 'サイクルタイム (時間)',
-                  data: weeklyTrend.map(w => w.avgCycleTimeHours),
+                  data: weeklyTrend.map((w) => w.avgCycleTimeHours),
                   borderColor: PrimitiveToken.colors.gray[100],
                   backgroundColor: hexToRgba(PrimitiveToken.colors.gray[100], 0.1),
                   yAxisID: 'y',
@@ -402,7 +445,7 @@ export const FlowMetricsDashboard: React.FC<FlowMetricsDashboardProps> = ({
                 },
                 {
                   label: 'レビュー待ち時間 (時間)',
-                  data: weeklyTrend.map(w => w.avgFirstReviewWaitHours),
+                  data: weeklyTrend.map((w) => w.avgFirstReviewWaitHours),
                   borderColor: PrimitiveToken.colors.gray[60],
                   backgroundColor: hexToRgba(PrimitiveToken.colors.gray[60], 0.1),
                   yAxisID: 'y',
@@ -410,7 +453,7 @@ export const FlowMetricsDashboard: React.FC<FlowMetricsDashboardProps> = ({
                 },
                 {
                   label: '修正往復回数',
-                  data: weeklyTrend.map(w => w.avgRevisionRounds),
+                  data: weeklyTrend.map((w) => w.avgRevisionRounds),
                   borderColor: PrimitiveToken.colors.red[50],
                   backgroundColor: hexToRgba(PrimitiveToken.colors.red[50], 0.1),
                   yAxisID: 'y1',
@@ -451,21 +494,23 @@ export const FlowMetricsDashboard: React.FC<FlowMetricsDashboardProps> = ({
       {/* 6. 担当者別フロー指標 */}
       {authorMetrics.length > 0 && (
         <Paper sx={{ p: 2, mb: 3 }}>
-          <Typography variant="h6" sx={{ mb: 2 }}>担当者別フロー指標</Typography>
+          <Typography variant="h6" sx={{ mb: 2 }}>
+            担当者別フロー指標
+          </Typography>
           <Grid container spacing={2}>
             <Grid xs={12} md={6}>
               <Bar
                 data={{
-                  labels: authorMetrics.slice(0, 10).map(a => a.author),
+                  labels: authorMetrics.slice(0, 10).map((a) => a.author),
                   datasets: [
                     {
                       label: 'サイクルタイム (時間)',
-                      data: authorMetrics.slice(0, 10).map(a => a.avgCycleTimeHours),
+                      data: authorMetrics.slice(0, 10).map((a) => a.avgCycleTimeHours),
                       backgroundColor: PrimitiveToken.colors.gray[100],
                     },
                     {
                       label: 'レビュー待ち (時間)',
-                      data: authorMetrics.slice(0, 10).map(a => a.avgFirstReviewWaitHours),
+                      data: authorMetrics.slice(0, 10).map((a) => a.avgFirstReviewWaitHours),
                       backgroundColor: PrimitiveToken.colors.gray[60],
                     },
                   ],
@@ -494,9 +539,11 @@ export const FlowMetricsDashboard: React.FC<FlowMetricsDashboardProps> = ({
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {authorMetrics.map(stat => (
+                    {authorMetrics.map((stat) => (
                       <TableRow key={stat.author}>
-                        <TableCell><strong>{stat.author}</strong></TableCell>
+                        <TableCell>
+                          <strong>{stat.author}</strong>
+                        </TableCell>
                         <TableCell align="center">{stat.prCount}</TableCell>
                         <TableCell align="center">
                           <Chip
@@ -533,21 +580,27 @@ export const FlowMetricsDashboard: React.FC<FlowMetricsDashboardProps> = ({
       {/* 7. レビュアー別反応速度 */}
       {reviewerMetrics.length > 0 && (
         <Paper sx={{ p: 2, mb: 3 }}>
-          <Typography variant="h6" sx={{ mb: 2 }}>レビュアー別反応速度</Typography>
+          <Typography variant="h6" sx={{ mb: 2 }}>
+            レビュアー別反応速度
+          </Typography>
           <Grid container spacing={2}>
             <Grid xs={12} md={6}>
               <Bar
                 data={{
-                  labels: reviewerMetrics.slice(0, 10).map(r => r.reviewer),
+                  labels: reviewerMetrics.slice(0, 10).map((r) => r.reviewer),
                   datasets: [
                     {
                       label: '平均反応時間 (時間)',
-                      data: reviewerMetrics.slice(0, 10).map(r => r.avgResponseTimeHours),
-                      backgroundColor: reviewerMetrics.slice(0, 10).map(r =>
-                        r.avgResponseTimeHours <= 4 ? PrimitiveToken.colors.gray[100] :
-                        r.avgResponseTimeHours <= 24 ? PrimitiveToken.colors.gray[60] :
-                        PrimitiveToken.colors.red[50]
-                      ),
+                      data: reviewerMetrics.slice(0, 10).map((r) => r.avgResponseTimeHours),
+                      backgroundColor: reviewerMetrics
+                        .slice(0, 10)
+                        .map((r) =>
+                          r.avgResponseTimeHours <= 4
+                            ? PrimitiveToken.colors.gray[100]
+                            : r.avgResponseTimeHours <= 24
+                              ? PrimitiveToken.colors.gray[60]
+                              : PrimitiveToken.colors.red[50],
+                        ),
                     },
                   ],
                 }}
@@ -574,9 +627,11 @@ export const FlowMetricsDashboard: React.FC<FlowMetricsDashboardProps> = ({
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {reviewerMetrics.map(stat => (
+                    {reviewerMetrics.map((stat) => (
                       <TableRow key={stat.reviewer}>
-                        <TableCell><strong>{stat.reviewer}</strong></TableCell>
+                        <TableCell>
+                          <strong>{stat.reviewer}</strong>
+                        </TableCell>
                         <TableCell align="center">{stat.reviewCount}</TableCell>
                         <TableCell align="center">
                           <Chip
@@ -585,12 +640,8 @@ export const FlowMetricsDashboard: React.FC<FlowMetricsDashboardProps> = ({
                             color={getWaitTimeColor(stat.avgResponseTimeHours)}
                           />
                         </TableCell>
-                        <TableCell align="center">
-                          {(stat.changesRequestedRatio * 100).toFixed(0)}%
-                        </TableCell>
-                        <TableCell align="center">
-                          {(stat.approvalRatio * 100).toFixed(0)}%
-                        </TableCell>
+                        <TableCell align="center">{(stat.changesRequestedRatio * 100).toFixed(0)}%</TableCell>
+                        <TableCell align="center">{(stat.approvalRatio * 100).toFixed(0)}%</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -607,7 +658,9 @@ export const FlowMetricsDashboard: React.FC<FlowMetricsDashboardProps> = ({
 
       {/* 8. 診断と改善アクション */}
       <Paper sx={{ p: 2 }}>
-        <Typography variant="h6" sx={{ mb: 2 }}>診断と改善アクション</Typography>
+        <Typography variant="h6" sx={{ mb: 2 }}>
+          診断と改善アクション
+        </Typography>
 
         {summary.fastFeedbackRatio >= 0.7 && summary.quickMergeRatio >= 0.7 && summary.lowRevisionRatio >= 0.7 && (
           <Alert severity="success" sx={{ mb: 2 }}>
@@ -618,7 +671,8 @@ export const FlowMetricsDashboard: React.FC<FlowMetricsDashboardProps> = ({
 
         {summary.fastFeedbackRatio < 0.4 && (
           <Alert severity="warning" sx={{ mb: 2 }}>
-            <strong>レビュー待ち時間が長い:</strong> フィードバックが遅れると、コンテキストスイッチングのコストが増加します。
+            <strong>レビュー待ち時間が長い:</strong>{' '}
+            フィードバックが遅れると、コンテキストスイッチングのコストが増加します。
             <Box component="ul" sx={{ pl: 2, mt: 1 }}>
               <li>レビュー時間をカレンダーにブロックする</li>
               <li>PRサイズを小さくして、レビューしやすくする</li>
@@ -650,7 +704,9 @@ export const FlowMetricsDashboard: React.FC<FlowMetricsDashboardProps> = ({
         )}
 
         <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.100', borderRadius: 1 }}>
-          <Typography variant="subtitle2" sx={{ mb: 1 }}>DORAフロー指標の意義</Typography>
+          <Typography variant="subtitle2" sx={{ mb: 1 }}>
+            DORAフロー指標の意義
+          </Typography>
           <Grid container spacing={2}>
             <Grid xs={12} md={4}>
               <Typography variant="body2">
@@ -671,5 +727,5 @@ export const FlowMetricsDashboard: React.FC<FlowMetricsDashboardProps> = ({
         </Box>
       </Paper>
     </Box>
-  );
-};
+  )
+}

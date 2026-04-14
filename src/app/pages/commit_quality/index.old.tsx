@@ -1,21 +1,21 @@
-import React from "react";
-import Box from "@mui/material/Box";
-import { Typography, Button, Alert } from "@mui/material";
-import { Link } from "react-router-dom";
-import { CommitQualityDashboard } from "../../components/commit_quality/commit_quality";
+import React from 'react'
+import Box from '@mui/material/Box'
+import { Typography, Button, Alert } from '@mui/material'
+import { Link } from 'react-router-dom'
+import { CommitQualityDashboard } from '../../components/commit_quality/commit_quality'
 
 export const CommitQualityPage = () => {
   const handlePrint = () => {
-    window.print();
-  };
+    window.print()
+  }
 
   const today = new Date().toLocaleDateString('ja-JP', {
     year: 'numeric',
     month: 'long',
-    day: 'numeric'
-  });
+    day: 'numeric',
+  })
 
-  const repoName = import.meta.env.VITE_GITHUB_REPO || 'Unknown Repository';
+  const repoName = import.meta.env.VITE_GITHUB_REPO || 'Unknown Repository'
 
   return (
     <Box component="section" sx={{ p: 3 }}>
@@ -30,19 +30,10 @@ export const CommitQualityPage = () => {
           </Typography>
         </Box>
         <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button
-            component={Link}
-            to="/"
-            variant="outlined"
-            className="no-print"
-          >
+          <Button component={Link} to="/" variant="outlined" className="no-print">
             ダッシュボードに戻る
           </Button>
-          <Button
-            variant="contained"
-            onClick={handlePrint}
-            className="no-print"
-          >
+          <Button variant="contained" onClick={handlePrint} className="no-print">
             PDF出力 / 印刷
           </Button>
         </Box>
@@ -52,7 +43,8 @@ export const CommitQualityPage = () => {
       <Alert severity="info" sx={{ mb: 3 }}>
         <strong>測定内容:</strong> 1コミットあたりの変更行数、サイズ分布、担当者別の働き方パターン。
         <br />
-        <strong>注意:</strong> 巨大コミットが多いと「後出しでまとめてコミット」の傾向。レビューが困難になり、バグ見逃しリスクが高まります。
+        <strong>注意:</strong>{' '}
+        巨大コミットが多いと「後出しでまとめてコミット」の傾向。レビューが困難になり、バグ見逃しリスクが高まります。
         <br />
         <strong>理想:</strong> 小さなコミット（XS+S）が70%以上。刻みながら設計・実装を進める働き方。
       </Alert>
@@ -60,5 +52,5 @@ export const CommitQualityPage = () => {
       {/* メインコンテンツ */}
       <CommitQualityDashboard />
     </Box>
-  );
-};
+  )
+}

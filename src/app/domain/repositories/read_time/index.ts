@@ -1,5 +1,5 @@
-import {ReadTimes} from "../../models/read_time/read.times";
+import { ReadTimes } from '../../models/read_time/read.times'
 
 export interface ReadTimeRepository {
-  find(): Promise<ReadTimes>;
+  find(owner: string, repo: string): Promise<ReadTimes>
 }

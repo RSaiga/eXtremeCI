@@ -1,6 +1,6 @@
-import React from "react";
-import {OpenPr} from "../../domain/models/open_pr/open_pr";
-import {StatusCount} from "../../domain/models/open_pr/open_prs";
+import React from 'react'
+import { OpenPr } from '../../domain/models/open_pr/open_pr'
+import { StatusCount } from '../../domain/models/open_pr/open_prs'
 import {
   Box,
   Card,
@@ -14,40 +14,45 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Typography
-} from "@mui/material";
-import Grid from '@mui/material/Unstable_Grid2';
-import { PrimitiveToken, hexToRgba } from "../ui/tokens/primitive-token";
+  Typography,
+} from '@mui/material'
+import Grid from '@mui/material/Unstable_Grid2'
+import { PrimitiveToken, hexToRgba } from '../ui/tokens/primitive-token'
 
 interface OpenPrListProps {
-  openPrs: OpenPr[];
-  statusCount: StatusCount;
-  totalCount: number;
-  staleCount: number;
-  oldCount: number;
-  avgOpenDays: number;
+  openPrs: OpenPr[]
+  statusCount: StatusCount
+  totalCount: number
+  staleCount: number
+  oldCount: number
+  avgOpenDays: number
 }
 
-const getOpenDaysColor = (days: number): "success" | "warning" | "error" => {
-  if (days <= 3) return 'success';
-  if (days <= 7) return 'warning';
-  return 'error';
-};
+const getOpenDaysColor = (days: number): 'success' | 'warning' | 'error' => {
+  if (days <= 3) return 'success'
+  if (days <= 7) return 'warning'
+  return 'error'
+}
 
-const getStatusColor = (status: string): "default" | "success" | "warning" | "error" | "info" => {
+const getStatusColor = (status: string): 'default' | 'success' | 'warning' | 'error' | 'info' => {
   switch (status) {
-    case '承認済み': return 'success';
-    case '変更要求': return 'error';
-    case 'レビュー待ち': return 'warning';
-    case 'Draft': return 'default';
-    default: return 'info';
+    case '承認済み':
+      return 'success'
+    case '変更要求':
+      return 'error'
+    case 'レビュー待ち':
+      return 'warning'
+    case 'Draft':
+      return 'default'
+    default:
+      return 'info'
   }
-};
+}
 
 export const OpenPrList: React.FC<OpenPrListProps> = (props) => {
-  const {openPrs, statusCount, totalCount, staleCount, oldCount, avgOpenDays} = props;
+  const { openPrs, statusCount, totalCount, staleCount, oldCount, avgOpenDays } = props
 
-  const sortedPrs = [...openPrs].sort((a, b) => b.openDays - a.openDays);
+  const sortedPrs = [...openPrs].sort((a, b) => b.openDays - a.openDays)
 
   return (
     <Box>
@@ -62,9 +67,7 @@ export const OpenPrList: React.FC<OpenPrListProps> = (props) => {
               <Typography color="text.secondary" gutterBottom>
                 オープンPR数
               </Typography>
-              <Typography variant="h4">
-                {totalCount}
-              </Typography>
+              <Typography variant="h4">{totalCount}</Typography>
             </CardContent>
           </Card>
         </Grid>
@@ -74,9 +77,7 @@ export const OpenPrList: React.FC<OpenPrListProps> = (props) => {
               <Typography color="text.secondary" gutterBottom>
                 平均オープン日数
               </Typography>
-              <Typography variant="h4">
-                {avgOpenDays}日
-              </Typography>
+              <Typography variant="h4">{avgOpenDays}日</Typography>
             </CardContent>
           </Card>
         </Grid>
@@ -131,8 +132,8 @@ export const OpenPrList: React.FC<OpenPrListProps> = (props) => {
       </Grid>
 
       {sortedPrs.length > 0 && (
-        <Paper sx={{width: '100%', overflow: 'hidden', mt: 2}}>
-          <TableContainer sx={{maxHeight: 400}}>
+        <Paper sx={{ width: '100%', overflow: 'hidden', mt: 2 }}>
+          <TableContainer sx={{ maxHeight: 400 }}>
             <Table stickyHeader size="small" aria-label="open pr table">
               <TableHead>
                 <TableRow>
@@ -150,9 +151,12 @@ export const OpenPrList: React.FC<OpenPrListProps> = (props) => {
                   <TableRow
                     key={pr.prNumber}
                     sx={{
-                      '&:last-child td, &:last-child th': {border: 0},
-                      backgroundColor: pr.isOld ? hexToRgba(PrimitiveToken.colors.red[60], 0.05) :
-                                       pr.isStale ? hexToRgba(PrimitiveToken.colors.orange[50], 0.05) : 'inherit'
+                      '&:last-child td, &:last-child th': { border: 0 },
+                      backgroundColor: pr.isOld
+                        ? hexToRgba(PrimitiveToken.colors.red[60], 0.05)
+                        : pr.isStale
+                          ? hexToRgba(PrimitiveToken.colors.orange[50], 0.05)
+                          : 'inherit',
                     }}
                   >
                     <TableCell>{pr.prNumber}</TableCell>
@@ -161,15 +165,9 @@ export const OpenPrList: React.FC<OpenPrListProps> = (props) => {
                     </TableCell>
                     <TableCell>{pr.author}</TableCell>
                     <TableCell align="right">
-                      <Chip
-                        label={`${pr.openDays}日`}
-                        color={getOpenDaysColor(pr.openDays)}
-                        size="small"
-                      />
+                      <Chip label={`${pr.openDays}日`} color={getOpenDaysColor(pr.openDays)} size="small" />
                     </TableCell>
-                    <TableCell align="right">
-                      {pr.daysSinceLastUpdate}日前
-                    </TableCell>
+                    <TableCell align="right">{pr.daysSinceLastUpdate}日前</TableCell>
                     <TableCell>
                       <Chip
                         label={pr.statusLabel}
@@ -179,12 +177,7 @@ export const OpenPrList: React.FC<OpenPrListProps> = (props) => {
                       />
                     </TableCell>
                     <TableCell>
-                      <Link
-                        href={pr.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        sx={{fontSize: '0.875rem'}}
-                      >
+                      <Link href={pr.url} target="_blank" rel="noopener noreferrer" sx={{ fontSize: '0.875rem' }}>
                         開く
                       </Link>
                     </TableCell>
@@ -197,12 +190,10 @@ export const OpenPrList: React.FC<OpenPrListProps> = (props) => {
       )}
 
       {sortedPrs.length === 0 && (
-        <Paper sx={{p: 3, mt: 2, textAlign: 'center'}}>
-          <Typography color="success.main">
-            オープン中のPRはありません
-          </Typography>
+        <Paper sx={{ p: 3, mt: 2, textAlign: 'center' }}>
+          <Typography color="success.main">オープン中のPRはありません</Typography>
         </Paper>
       )}
     </Box>
-  );
-};
+  )
+}

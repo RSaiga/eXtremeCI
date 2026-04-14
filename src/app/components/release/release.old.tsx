@@ -1,20 +1,20 @@
-import {Paper, Table, TableBody, TableCell, TableContainer, TableHead, TablePagination, TableRow} from "@mui/material";
-import React from "react";
+import { Paper, Table, TableBody, TableCell, TableContainer, TableHead, TablePagination, TableRow } from '@mui/material'
+import React from 'react'
 
 export const Release = (props) => {
-  const [page, setPage] = React.useState(0);
-  const [rowsPerPage, setRowsPerPage] = React.useState(10);
+  const [page, setPage] = React.useState(0)
+  const [rowsPerPage, setRowsPerPage] = React.useState(10)
   const handleChangePage = (event: unknown, newPage: number) => {
-    setPage(newPage);
-  };
+    setPage(newPage)
+  }
   const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setRowsPerPage(+event.target.value);
-    setPage(0);
-  };
+    setRowsPerPage(+event.target.value)
+    setPage(0)
+  }
   return (
     <>
-      <Paper sx={{width: '100%', overflow: 'hidden'}}>
-        <TableContainer sx={{maxHeight: 350}}>
+      <Paper sx={{ width: '100%', overflow: 'hidden' }}>
+        <TableContainer sx={{ maxHeight: 350 }}>
           <Table stickyHeader size="small" aria-label="simple table">
             <TableHead>
               <TableRow>
@@ -26,10 +26,7 @@ export const Release = (props) => {
             </TableHead>
             <TableBody>
               {props.readTimes.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((row, index) => (
-                <TableRow
-                  key={index}
-                  sx={{'&:last-child td, &:last-child th': {border: 0}}}
-                >
+                <TableRow key={index} sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
                   <TableCell component="th" scope="row">
                     {row.title}
                   </TableCell>
@@ -52,5 +49,5 @@ export const Release = (props) => {
         />
       </Paper>
     </>
-  );
+  )
 }

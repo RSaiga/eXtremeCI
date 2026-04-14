@@ -1,4 +1,4 @@
-import React from "react";
+import React from 'react'
 import {
   Box,
   Card,
@@ -12,129 +12,132 @@ import {
   TableRow,
   Typography,
   Chip,
-  LinearProgress
-} from "@mui/material";
-import Grid from '@mui/material/Unstable_Grid2';
-import {Bar, Line} from "react-chartjs-2";
-import {Chart, registerables} from 'chart.js';
-import {ReadTimes} from "../../domain/models/read_time/read.times";
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import TrendingDownIcon from '@mui/icons-material/TrendingDown';
-import TrendingFlatIcon from '@mui/icons-material/TrendingFlat';
-import { PrimitiveToken, hexToRgba } from "../ui/tokens/primitive-token";
+  LinearProgress,
+} from '@mui/material'
+import Grid from '@mui/material/Unstable_Grid2'
+import { Bar, Line } from 'react-chartjs-2'
+import { Chart, registerables } from 'chart.js'
+import { ReadTimes } from '../../domain/models/read_time/read.times'
+import TrendingUpIcon from '@mui/icons-material/TrendingUp'
+import TrendingDownIcon from '@mui/icons-material/TrendingDown'
+import TrendingFlatIcon from '@mui/icons-material/TrendingFlat'
+import { PrimitiveToken, hexToRgba } from '../ui/tokens/primitive-token'
 
-Chart.register(...registerables);
+Chart.register(...registerables)
 
 interface LeadTimeAnalysisProps {
-  readTimes: ReadTimes;
+  readTimes: ReadTimes
 }
 
-export const LeadTimeAnalysis: React.FC<LeadTimeAnalysisProps> = ({readTimes}) => {
-  const totalPRs = readTimes?.values?.length || 0;
+export const LeadTimeAnalysis: React.FC<LeadTimeAnalysisProps> = ({ readTimes }) => {
+  const totalPRs = readTimes?.values?.length || 0
 
   // データがない場合の早期リターン
   if (totalPRs === 0) {
     return (
       <Box>
-        <Typography color="text.secondary">
-          分析対象のPRデータがありません
-        </Typography>
+        <Typography color="text.secondary">分析対象のPRデータがありません</Typography>
       </Box>
-    );
+    )
   }
 
-  const distribution = readTimes.distribution();
-  const categoryCount = readTimes.countByCategory();
-  const authorStats = readTimes.statsByAuthor();
-  const weeklyTrend = readTimes.weeklyTrend();
-  const trendAnalysis = readTimes.getTrendAnalysis();
+  const distribution = readTimes.distribution()
+  const categoryCount = readTimes.countByCategory()
+  const authorStats = readTimes.statsByAuthor()
+  const weeklyTrend = readTimes.weeklyTrend()
+  const trendAnalysis = readTimes.getTrendAnalysis()
 
   // 分布ヒストグラム
   const distributionData = {
-    labels: distribution.map(d => d.range),
-    datasets: [{
-      label: 'PR数',
-      data: distribution.map(d => d.count),
-      backgroundColor: distribution.map(d => d.color),
-      borderWidth: 1
-    }]
-  };
+    labels: distribution.map((d) => d.range),
+    datasets: [
+      {
+        label: 'PR数',
+        data: distribution.map((d) => d.count),
+        backgroundColor: distribution.map((d) => d.color),
+        borderWidth: 1,
+      },
+    ],
+  }
 
   const distributionOptions = {
     responsive: true,
     plugins: {
       legend: { display: false },
-      title: { display: true, text: 'リードタイム分布' }
+      title: { display: true, text: 'リードタイム分布' },
     },
     scales: {
-      y: { beginAtZero: true, title: { display: true, text: 'PR数' } }
-    }
-  };
+      y: { beginAtZero: true, title: { display: true, text: 'PR数' } },
+    },
+  }
 
   // 週別トレンド
   const weeklyData = {
-    labels: weeklyTrend.map(w => w.week),
+    labels: weeklyTrend.map((w) => w.week),
     datasets: [
       {
         label: '中央値（時間）',
-        data: weeklyTrend.map(w => w.medianHours),
+        data: weeklyTrend.map((w) => w.medianHours),
         borderColor: PrimitiveToken.colors.blue[60],
         backgroundColor: hexToRgba(PrimitiveToken.colors.blue[60], 0.2),
         fill: true,
-        tension: 0.3
+        tension: 0.3,
       },
       {
         label: '平均値（時間）',
-        data: weeklyTrend.map(w => w.avgHours),
+        data: weeklyTrend.map((w) => w.avgHours),
         borderColor: PrimitiveToken.colors.yellow[50],
         backgroundColor: hexToRgba(PrimitiveToken.colors.yellow[50], 0.1),
         fill: false,
         tension: 0.3,
-        borderDash: [5, 5]
-      }
-    ]
-  };
+        borderDash: [5, 5],
+      },
+    ],
+  }
 
   const weeklyOptions = {
     responsive: true,
     plugins: {
       legend: { position: 'top' as const },
-      title: { display: true, text: '週別リードタイム推移' }
+      title: { display: true, text: '週別リードタイム推移' },
     },
     scales: {
       y: { beginAtZero: true, title: { display: true, text: '時間' } },
-      x: { ticks: { maxRotation: 45 } }
-    }
-  };
+      x: { ticks: { maxRotation: 45 } },
+    },
+  }
 
   // カテゴリ色
   const getCategoryColor = (category: string) => {
     switch (category) {
-      case 'Fast': return 'success';
-      case 'Normal': return 'info';
-      case 'Slow': return 'warning';
-      case 'Very Slow': return 'error';
-      default: return 'default';
+      case 'Fast':
+        return 'success'
+      case 'Normal':
+        return 'info'
+      case 'Slow':
+        return 'warning'
+      case 'Very Slow':
+        return 'error'
+      default:
+        return 'default'
     }
-  };
+  }
 
   // 時間を読みやすい形式に変換
   const formatHours = (hours: number): string => {
-    if (hours < 1) return `${Math.round(hours * 60)}分`;
-    if (hours < 24) return `${hours.toFixed(1)}時間`;
-    const days = hours / 24;
-    return `${days.toFixed(1)}日`;
-  };
+    if (hours < 1) return `${Math.round(hours * 60)}分`
+    if (hours < 24) return `${hours.toFixed(1)}時間`
+    const days = hours / 24
+    return `${days.toFixed(1)}日`
+  }
 
   // トレンドアイコン
   const TrendIcon = () => {
     if (trendAnalysis.message === '横ばい' || trendAnalysis.message === 'データ不足') {
-      return <TrendingFlatIcon color="action" />;
+      return <TrendingFlatIcon color="action" />
     }
-    return trendAnalysis.improving
-      ? <TrendingDownIcon color="success" />
-      : <TrendingUpIcon color="error" />;
-  };
+    return trendAnalysis.improving ? <TrendingDownIcon color="success" /> : <TrendingUpIcon color="error" />
+  }
 
   return (
     <Box>
@@ -146,9 +149,7 @@ export const LeadTimeAnalysis: React.FC<LeadTimeAnalysisProps> = ({readTimes}) =
               <Typography color="text.secondary" gutterBottom>
                 PR数
               </Typography>
-              <Typography variant="h4">
-                {totalPRs}
-              </Typography>
+              <Typography variant="h4">{totalPRs}</Typography>
             </CardContent>
           </Card>
         </Grid>
@@ -158,9 +159,7 @@ export const LeadTimeAnalysis: React.FC<LeadTimeAnalysisProps> = ({readTimes}) =
               <Typography color="text.secondary" gutterBottom>
                 中央値
               </Typography>
-              <Typography variant="h4">
-                {formatHours(readTimes.median())}
-              </Typography>
+              <Typography variant="h4">{formatHours(readTimes.median())}</Typography>
             </CardContent>
           </Card>
         </Grid>
@@ -170,9 +169,7 @@ export const LeadTimeAnalysis: React.FC<LeadTimeAnalysisProps> = ({readTimes}) =
               <Typography color="text.secondary" gutterBottom>
                 平均値
               </Typography>
-              <Typography variant="h4">
-                {formatHours(readTimes.avg())}
-              </Typography>
+              <Typography variant="h4">{formatHours(readTimes.avg())}</Typography>
             </CardContent>
           </Card>
         </Grid>
@@ -206,7 +203,9 @@ export const LeadTimeAnalysis: React.FC<LeadTimeAnalysisProps> = ({readTimes}) =
                   color={
                     trendAnalysis.message === '横ばい' || trendAnalysis.message === 'データ不足'
                       ? 'text.secondary'
-                      : trendAnalysis.improving ? 'success.main' : 'error.main'
+                      : trendAnalysis.improving
+                        ? 'success.main'
+                        : 'error.main'
                   }
                 >
                   {trendAnalysis.message}
@@ -227,16 +226,14 @@ export const LeadTimeAnalysis: React.FC<LeadTimeAnalysisProps> = ({readTimes}) =
         </Typography>
         <Grid container spacing={2}>
           {Object.entries(categoryCount).map(([category, count]) => {
-            const percent = totalPRs > 0 ? (count / totalPRs) * 100 : 0;
+            const percent = totalPRs > 0 ? (count / totalPRs) * 100 : 0
             return (
               <Grid xs={3} key={category}>
                 <Box sx={{ textAlign: 'center' }}>
-                  <Chip
-                    label={category}
-                    color={getCategoryColor(category) as any}
-                    sx={{ mb: 1 }}
-                  />
-                  <Typography variant="h6">{count}件 ({percent.toFixed(0)}%)</Typography>
+                  <Chip label={category} color={getCategoryColor(category) as any} sx={{ mb: 1 }} />
+                  <Typography variant="h6">
+                    {count}件 ({percent.toFixed(0)}%)
+                  </Typography>
                   <LinearProgress
                     variant="determinate"
                     value={percent}
@@ -251,7 +248,7 @@ export const LeadTimeAnalysis: React.FC<LeadTimeAnalysisProps> = ({readTimes}) =
                   </Typography>
                 </Box>
               </Grid>
-            );
+            )
           })}
         </Grid>
       </Paper>
@@ -323,5 +320,5 @@ export const LeadTimeAnalysis: React.FC<LeadTimeAnalysisProps> = ({readTimes}) =
         </Paper>
       )}
     </Box>
-  );
-};
+  )
+}

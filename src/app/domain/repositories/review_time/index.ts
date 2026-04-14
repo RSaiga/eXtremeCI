@@ -1,5 +1,5 @@
-import {ReviewTimes} from "../../models/review_time/review_times";
+import { ReviewTimes } from '../../models/review_time/review_times'
 
 export interface ReviewTimeRepository {
-  find(): Promise<ReviewTimes>;
+  find(owner: string, repo: string): Promise<ReviewTimes>
 }

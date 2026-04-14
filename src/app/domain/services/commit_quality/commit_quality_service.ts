@@ -1,4 +1,5 @@
-import { CommitData, commitDataCache } from '../../../infra/github/commit_data';
+import { CommitData, commitDataCache } from '../../../infra/github/commit_data'
+import { RepoRef } from '../../../shared/repos/config'
 import {
   CommitQualityMetrics,
   AuthorCommitQuality,
@@ -7,75 +8,74 @@ import {
   categorizeCommitSize,
   calculateReviewabilityScore,
   determineWorkStyle,
-} from '../../models/commit_quality/commit_quality';
+} from '../../models/commit_quality/commit_quality'
 
 function calculateMedian(values: number[]): number {
-  if (values.length === 0) return 0;
-  const sorted = [...values].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 !== 0
-    ? sorted[mid]
-    : (sorted[mid - 1] + sorted[mid]) / 2;
+  if (values.length === 0) return 0
+  const sorted = [...values].sort((a, b) => a - b)
+  const mid = Math.floor(sorted.length / 2)
+  return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2
 }
 
 function getWeekStart(date: Date): Date {
-  const d = new Date(date);
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-  d.setDate(diff);
-  d.setHours(0, 0, 0, 0);
-  return d;
+  const d = new Date(date)
+  const day = d.getDay()
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1)
+  d.setDate(diff)
+  d.setHours(0, 0, 0, 0)
+  return d
 }
 
 function formatWeekLabel(weekStart: Date): string {
-  const month = weekStart.getMonth() + 1;
-  const day = weekStart.getDate();
-  return `${month}/${day}週`;
+  const month = weekStart.getMonth() + 1
+  const day = weekStart.getDate()
+  return `${month}/${day}週`
 }
 
-export async function analyzeCommitQuality(): Promise<CommitQualityMetrics> {
-  const commits = await commitDataCache.getCommits();
+async function fetchAllCommits(repos: RepoRef[]): Promise<CommitData[]> {
+  const lists = await Promise.all(repos.map(({ owner, repo }) => commitDataCache.getCommits(owner, repo)))
+  return lists.flat()
+}
+
+export async function analyzeCommitQuality(repos: RepoRef[]): Promise<CommitQualityMetrics> {
+  const commits = await fetchAllCommits(repos)
 
   if (commits.length === 0) {
-    return createEmptyMetrics();
+    return createEmptyMetrics()
   }
 
-  const lineCounts = commits.map(c => c.additions + c.deletions);
+  const lineCounts = commits.map((c) => c.additions + c.deletions)
 
   // サイズ分布を計算
-  const sizeDistribution = COMMIT_SIZE_CATEGORIES.map(category => {
-    const count = commits.filter(c => {
-      const lines = c.additions + c.deletions;
-      return categorizeCommitSize(lines).name === category.name;
-    }).length;
+  const sizeDistribution = COMMIT_SIZE_CATEGORIES.map((category) => {
+    const count = commits.filter((c) => {
+      const lines = c.additions + c.deletions
+      return categorizeCommitSize(lines).name === category.name
+    }).length
     return {
       category,
       count,
       percentage: (count / commits.length) * 100,
-    };
-  });
+    }
+  })
 
   // 品質指標
-  const xsCount = sizeDistribution.find(d => d.category.name === 'XS')?.count || 0;
-  const sCount = sizeDistribution.find(d => d.category.name === 'S')?.count || 0;
-  const lCount = sizeDistribution.find(d => d.category.name === 'L')?.count || 0;
-  const xlCount = sizeDistribution.find(d => d.category.name === 'XL')?.count || 0;
+  const xsCount = sizeDistribution.find((d) => d.category.name === 'XS')?.count || 0
+  const sCount = sizeDistribution.find((d) => d.category.name === 'S')?.count || 0
+  const lCount = sizeDistribution.find((d) => d.category.name === 'L')?.count || 0
+  const xlCount = sizeDistribution.find((d) => d.category.name === 'XL')?.count || 0
 
-  const smallCommitRatio = (xsCount + sCount) / commits.length;
-  const largeCommitRatio = (lCount + xlCount) / commits.length;
-  const giantCommitRatio = xlCount / commits.length;
+  const smallCommitRatio = (xsCount + sCount) / commits.length
+  const largeCommitRatio = (lCount + xlCount) / commits.length
+  const giantCommitRatio = xlCount / commits.length
 
-  const avgLines = lineCounts.reduce((a, b) => a + b, 0) / lineCounts.length;
-  const medianLines = calculateMedian(lineCounts);
+  const avgLines = lineCounts.reduce((a, b) => a + b, 0) / lineCounts.length
+  const medianLines = calculateMedian(lineCounts)
 
-  const reviewabilityScore = calculateReviewabilityScore(
-    smallCommitRatio,
-    largeCommitRatio,
-    avgLines
-  );
+  const reviewabilityScore = calculateReviewabilityScore(smallCommitRatio, largeCommitRatio, avgLines)
 
   // 週次トレンド
-  const weeklyTrend = calculateWeeklyTrend(commits);
+  const weeklyTrend = calculateWeeklyTrend(commits)
 
   return {
     totalCommits: commits.length,
@@ -87,41 +87,44 @@ export async function analyzeCommitQuality(): Promise<CommitQualityMetrics> {
     giantCommitRatio,
     reviewabilityScore,
     weeklyTrend,
-  };
+  }
 }
 
-export async function analyzeAuthorCommitQuality(): Promise<AuthorCommitQuality[]> {
-  const commits = await commitDataCache.getCommits();
+export async function analyzeAuthorCommitQuality(repos: RepoRef[]): Promise<AuthorCommitQuality[]> {
+  const commits = await fetchAllCommits(repos)
 
   // 著者別にグループ化
-  const authorMap = new Map<string, CommitData[]>();
+  const authorMap = new Map<string, CommitData[]>()
   for (const commit of commits) {
-    const existing = authorMap.get(commit.author) || [];
-    existing.push(commit);
-    authorMap.set(commit.author, existing);
+    const existing = authorMap.get(commit.author) || []
+    existing.push(commit)
+    authorMap.set(commit.author, existing)
   }
 
-  const results: AuthorCommitQuality[] = [];
+  const results: AuthorCommitQuality[] = []
 
   for (const [author, authorCommits] of authorMap) {
-    const lineCounts = authorCommits.map(c => c.additions + c.deletions);
-    const avgLines = lineCounts.reduce((a, b) => a + b, 0) / lineCounts.length;
-    const medianLines = calculateMedian(lineCounts);
+    const lineCounts = authorCommits.map((c) => c.additions + c.deletions)
+    const avgLines = lineCounts.reduce((a, b) => a + b, 0) / lineCounts.length
+    const medianLines = calculateMedian(lineCounts)
 
     // サイズ分布
-    let xsCount = 0, sCount = 0, lCount = 0, xlCount = 0;
+    let xsCount = 0
+    let sCount = 0
+    let lCount = 0
+    let xlCount = 0
     for (const lines of lineCounts) {
-      const cat = categorizeCommitSize(lines).name;
-      if (cat === 'XS') xsCount++;
-      else if (cat === 'S') sCount++;
-      else if (cat === 'L') lCount++;
-      else if (cat === 'XL') xlCount++;
+      const cat = categorizeCommitSize(lines).name
+      if (cat === 'XS') xsCount++
+      else if (cat === 'S') sCount++
+      else if (cat === 'L') lCount++
+      else if (cat === 'XL') xlCount++
     }
 
-    const smallRatio = (xsCount + sCount) / authorCommits.length;
-    const largeRatio = (lCount + xlCount) / authorCommits.length;
+    const smallRatio = (xsCount + sCount) / authorCommits.length
+    const largeRatio = (lCount + xlCount) / authorCommits.length
 
-    const workStyleResult = determineWorkStyle(smallRatio, largeRatio);
+    const workStyleResult = determineWorkStyle(smallRatio, largeRatio)
 
     results.push({
       author,
@@ -133,36 +136,37 @@ export async function analyzeAuthorCommitQuality(): Promise<AuthorCommitQuality[
       reviewabilityScore: calculateReviewabilityScore(smallRatio, largeRatio, avgLines),
       workStyle: workStyleResult.style,
       workStyleLabel: workStyleResult.label,
-    });
+    })
   }
 
   // レビューしやすさスコア降順
-  return results.sort((a, b) => b.reviewabilityScore - a.reviewabilityScore);
+  return results.sort((a, b) => b.reviewabilityScore - a.reviewabilityScore)
 }
 
 function calculateWeeklyTrend(commits: CommitData[]): WeeklyCommitQuality[] {
-  const weekMap = new Map<string, CommitData[]>();
+  const weekMap = new Map<string, CommitData[]>()
 
   for (const commit of commits) {
-    const weekStart = getWeekStart(commit.committedDate);
-    const key = weekStart.toISOString();
-    const existing = weekMap.get(key) || [];
-    existing.push(commit);
-    weekMap.set(key, existing);
+    const weekStart = getWeekStart(commit.committedDate)
+    const key = weekStart.toISOString()
+    const existing = weekMap.get(key) || []
+    existing.push(commit)
+    weekMap.set(key, existing)
   }
 
-  const results: WeeklyCommitQuality[] = [];
+  const results: WeeklyCommitQuality[] = []
 
   for (const [weekKey, weekCommits] of weekMap) {
-    const weekStart = new Date(weekKey);
-    const lineCounts = weekCommits.map(c => c.additions + c.deletions);
-    const avgLines = lineCounts.reduce((a, b) => a + b, 0) / lineCounts.length;
+    const weekStart = new Date(weekKey)
+    const lineCounts = weekCommits.map((c) => c.additions + c.deletions)
+    const avgLines = lineCounts.reduce((a, b) => a + b, 0) / lineCounts.length
 
-    let smallCount = 0, largeCount = 0;
+    let smallCount = 0
+    let largeCount = 0
     for (const lines of lineCounts) {
-      const cat = categorizeCommitSize(lines).name;
-      if (cat === 'XS' || cat === 'S') smallCount++;
-      if (cat === 'L' || cat === 'XL') largeCount++;
+      const cat = categorizeCommitSize(lines).name
+      if (cat === 'XS' || cat === 'S') smallCount++
+      if (cat === 'L' || cat === 'XL') largeCount++
     }
 
     results.push({
@@ -172,11 +176,11 @@ function calculateWeeklyTrend(commits: CommitData[]): WeeklyCommitQuality[] {
       avgLines: Math.round(avgLines),
       smallRatio: smallCount / weekCommits.length,
       largeRatio: largeCount / weekCommits.length,
-    });
+    })
   }
 
   // 日付順
-  return results.sort((a, b) => a.weekStart.getTime() - b.weekStart.getTime());
+  return results.sort((a, b) => a.weekStart.getTime() - b.weekStart.getTime())
 }
 
 function createEmptyMetrics(): CommitQualityMetrics {
@@ -184,7 +188,7 @@ function createEmptyMetrics(): CommitQualityMetrics {
     totalCommits: 0,
     avgLinesPerCommit: 0,
     medianLinesPerCommit: 0,
-    sizeDistribution: COMMIT_SIZE_CATEGORIES.map(category => ({
+    sizeDistribution: COMMIT_SIZE_CATEGORIES.map((category) => ({
       category,
       count: 0,
       percentage: 0,
@@ -194,5 +198,5 @@ function createEmptyMetrics(): CommitQualityMetrics {
     giantCommitRatio: 0,
     reviewabilityScore: 0,
     weeklyTrend: [],
-  };
+  }
 }
