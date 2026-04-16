@@ -13,6 +13,9 @@ import { ReviewRelation } from '../../models/review_network/review_relation'
 import { ReviewNetwork } from '../../models/review_network/review_network'
 import { Contributor } from '../../models/contributor/contributor'
 import { Contributors } from '../../models/contributor/contributors'
+import { isExcludedReviewer } from '../../../shared/excluded_reviewers'
+import { TeamMetrics } from '../../models/team/team_metrics'
+import { TeamService } from '../team/team_service'
 
 export interface DashboardData {
   readTimes: ReadTimes
@@ -21,6 +24,8 @@ export interface DashboardData {
   openPrs: OpenPrs
   reviewNetwork: ReviewNetwork
   contributors: Contributors
+  teamMetrics: TeamMetrics
+  closedPrs: PrDetailData[] // チームタブのスプリントスコープ再計算用
 }
 
 const NINETY_DAYS_AGO = () => {
@@ -80,6 +85,7 @@ function buildReviewTimes(closedPrs: PrDetailData[]): ReviewTimes {
 
     const validReviews = pr.reviews
       .filter((r) => r.state !== 'PENDING' && r.submitted_at)
+      .filter((r) => !isExcludedReviewer(r.user?.login))
       .sort((a, b) => new Date(a.submitted_at).getTime() - new Date(b.submitted_at).getTime())
 
     const firstReview = validReviews[0]
@@ -92,6 +98,7 @@ function buildReviewTimes(closedPrs: PrDetailData[]): ReviewTimes {
         firstReview ? new Date(firstReview.submitted_at) : null,
         firstReview?.user?.login || null,
         pr.number,
+        pr.merged_at !== null,
       ),
     )
   }
@@ -105,6 +112,7 @@ function buildOpenPrs(openPrs: PrDetailData[]): OpenPrs {
   for (const pr of openPrs) {
     const validReviews = pr.reviews
       .filter((r) => r.state !== 'PENDING' && r.state !== 'DISMISSED')
+      .filter((r) => !isExcludedReviewer(r.user?.login))
       .sort((a, b) => new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime())
 
     let reviewState: ReviewState = 'NONE'
@@ -142,7 +150,7 @@ function buildOpenPrs(openPrs: PrDetailData[]): OpenPrs {
   return new OpenPrs(result)
 }
 
-function buildReviewNetwork(closedPrs: PrDetailData[]): ReviewNetwork {
+export function buildReviewNetwork(closedPrs: PrDetailData[]): ReviewNetwork {
   const ninetyDaysAgo = NINETY_DAYS_AGO()
   const relationMap = new Map<string, number>()
 
@@ -158,6 +166,7 @@ function buildReviewNetwork(closedPrs: PrDetailData[]): ReviewNetwork {
       if (review.state === 'PENDING' || review.state === 'DISMISSED') continue
       if (!review.user?.login) continue
       if (review.user.login === author) continue // 自己レビューは除外
+      if (isExcludedReviewer(review.user.login)) continue
       reviewers.add(review.user.login)
     }
 
@@ -249,6 +258,7 @@ export const DashboardService = {
     const openPrs = buildOpenPrs(openPrsData)
     const reviewNetwork = buildReviewNetwork(closedPrs)
     const contributors = buildContributors(contributorStats, dailyCommits)
+    const teamMetrics = TeamService.build(closedPrs, contributors, reviewNetwork)
 
     return {
       readTimes,
@@ -257,6 +267,8 @@ export const DashboardService = {
       openPrs,
       reviewNetwork,
       contributors,
+      teamMetrics,
+      closedPrs,
     }
   },
 }

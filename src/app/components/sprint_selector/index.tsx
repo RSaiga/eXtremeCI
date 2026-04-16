@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Box, Button, MenuItem, Popover, Stack, TextField, Typography } from '@mui/material'
+import { Box, Button, IconButton, MenuItem, Popover, Stack, TextField, Typography } from '@mui/material'
 import { useSprint } from '../../shared/sprint/context'
 import { defaultSprintConfig } from '../../shared/sprint/config'
 import { alignStartDateToToday } from '../../shared/sprint/calc'
@@ -14,8 +14,11 @@ function dateToInput(d: Date): string {
 }
 
 export const SprintSelector: React.FC = () => {
-  const { config, setConfig, current, now } = useSprint()
+  const { config, setConfig, current, now, all, offset, setOffset } = useSprint()
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null)
+  const minOffset = all.length > 0 ? all[0].index : 0
+  const canPrev = offset > minOffset
+  const canNext = offset < 0
   const [startDate, setStartDate] = useState(dateToInput(current.start))
   const [weeks, setWeeks] = useState<number>(Math.max(1, Math.min(4, Math.round(config.lengthDays / 7))))
 
@@ -43,28 +46,54 @@ export const SprintSelector: React.FC = () => {
 
   return (
     <>
-      <Button
-        variant="outlined"
-        size="small"
-        onClick={open}
-        sx={{
-          textTransform: 'none',
-          borderColor: '#e0e0e0',
-          color: '#111827',
-          fontWeight: 600,
-          '&:hover': { borderColor: '#1976d2', bgcolor: '#f9fafb' },
-        }}
-      >
-        <Stack direction="row" alignItems="center" spacing={1}>
-          <Box component="span" sx={{ fontSize: 11, color: '#6b7280' }}>
-            スプリント
+      <Stack direction="row" alignItems="center" spacing={0.5}>
+        <IconButton
+          size="small"
+          disabled={!canPrev}
+          onClick={() => setOffset(offset - 1)}
+          sx={{ border: '1px solid #e0e0e0', borderRadius: 1 }}
+          aria-label="前のスプリント"
+        >
+          <Box component="span" sx={{ fontSize: 14, lineHeight: 1, fontWeight: 700 }}>
+            ◀
           </Box>
-          <Box component="span">{current.label}</Box>
-          <Box component="span" sx={{ fontSize: 11, color: '#6b7280' }}>
-            · {config.lengthDays / 7}週
+        </IconButton>
+        <Button
+          variant="outlined"
+          size="small"
+          onClick={open}
+          sx={{
+            textTransform: 'none',
+            borderColor: '#e0e0e0',
+            color: '#111827',
+            fontWeight: 600,
+            minWidth: 220,
+            justifyContent: 'center',
+            '&:hover': { borderColor: '#1976d2', bgcolor: '#f9fafb' },
+          }}
+        >
+          <Stack direction="row" alignItems="center" spacing={1}>
+            <Box component="span" sx={{ fontSize: 11, color: '#6b7280' }}>
+              スプリント
+            </Box>
+            <Box component="span">{current.label}</Box>
+            <Box component="span" sx={{ fontSize: 11, color: '#6b7280' }}>
+              · {config.lengthDays / 7}週{offset < 0 ? ` · ${offset}` : ''}
+            </Box>
+          </Stack>
+        </Button>
+        <IconButton
+          size="small"
+          disabled={!canNext}
+          onClick={() => setOffset(offset + 1)}
+          sx={{ border: '1px solid #e0e0e0', borderRadius: 1 }}
+          aria-label="次のスプリント"
+        >
+          <Box component="span" sx={{ fontSize: 14, lineHeight: 1, fontWeight: 700 }}>
+            ▶
           </Box>
-        </Stack>
-      </Button>
+        </IconButton>
+      </Stack>
       <Popover
         open={Boolean(anchorEl)}
         anchorEl={anchorEl}

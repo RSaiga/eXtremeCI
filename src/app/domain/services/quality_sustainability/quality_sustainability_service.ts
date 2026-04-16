@@ -12,9 +12,11 @@ import {
   WeeklyRefactoringData,
   TEST_FILE_PATTERNS,
   detectPrType,
+  hasInlineRefactorCommit,
   calculateSustainabilityScore,
   getSustainabilityGrade,
   determineOrientation,
+  determineFlowHealth,
 } from '../../models/quality_sustainability/quality_sustainability'
 
 // ファイル一覧のキャッシュ（repo単位でキー化）
@@ -35,8 +37,28 @@ function formatWeekLabel(weekStart: Date): string {
   return `${month}/${day}週`
 }
 
+function loadExtraTestPatterns(): RegExp[] {
+  const env = (process.env as Record<string, string | undefined>).VITE_TEST_FILE_PATTERNS || ''
+  return env
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((src) => {
+      try {
+        return new RegExp(src)
+      } catch (e) {
+        console.warn(`Invalid VITE_TEST_FILE_PATTERNS entry: ${src}`, e)
+        return null
+      }
+    })
+    .filter((r): r is RegExp => r !== null)
+}
+
+const EXTRA_TEST_PATTERNS = loadExtraTestPatterns()
+const ALL_TEST_PATTERNS = [...TEST_FILE_PATTERNS, ...EXTRA_TEST_PATTERNS]
+
 function isTestFile(filename: string): boolean {
-  return TEST_FILE_PATTERNS.some((pattern) => pattern.test(filename))
+  return ALL_TEST_PATTERNS.some((pattern) => pattern.test(filename))
 }
 
 async function fetchPrFiles(owner: string, repo: string, prNumber: number): Promise<string[]> {
@@ -63,12 +85,26 @@ async function fetchPrFiles(owner: string, repo: string, prNumber: number): Prom
   }
 }
 
-export async function analyzeQualitySustainability(repos: RepoRef[]): Promise<QualitySustainabilityMetrics> {
+export interface DateRange {
+  from: Date
+  to: Date
+}
+
+function inRange(d: Date, range?: DateRange): boolean {
+  if (!range) return true
+  const t = d.getTime()
+  return t >= range.from.getTime() && t < range.to.getTime()
+}
+
+export async function analyzeQualitySustainability(
+  repos: RepoRef[],
+  dateRange?: DateRange,
+): Promise<QualitySustainabilityMetrics> {
   // 各リポジトリから並列取得してマージ
   const perRepo = await Promise.all(
     repos.map(async ({ owner, repo }) => {
       const closedPrs = await prDataCache.getClosedPrs(owner, repo)
-      const mergedForRepo = closedPrs.filter((pr) => pr.merged_at)
+      const mergedForRepo = closedPrs.filter((pr) => pr.merged_at && inRange(new Date(pr.merged_at), dateRange))
       const qualityInfo = await collectPrQualityInfo(owner, repo, mergedForRepo.slice(0, 30))
       return { mergedForRepo, qualityInfo }
     }),
@@ -77,7 +113,7 @@ export async function analyzeQualitySustainability(repos: RepoRef[]): Promise<Qu
   const prsWithQualityInfo = perRepo.flatMap((p) => p.qualityInfo)
 
   // テストメトリクス
-  const testMetrics = analyzeTestMetrics(prsWithQualityInfo, mergedPrs)
+  const testMetrics = analyzeTestMetrics(prsWithQualityInfo)
 
   // CIメトリクス（GraphQLで取得済み）
   const ciMetrics = analyzeCIMetrics(mergedPrs)
@@ -89,14 +125,15 @@ export async function analyzeQualitySustainability(repos: RepoRef[]): Promise<Qu
   const sustainabilityScore = calculateSustainabilityScore(
     testMetrics.testInclusionRate,
     ciMetrics.successRate,
-    refactoringMetrics.refactoringRate,
+    refactoringMetrics.inlineRefactorRate,
+    refactoringMetrics.standalonePrRate,
   )
 
   const sustainabilityGrade = getSustainabilityGrade(sustainabilityScore)
 
   const { orientation, label: orientationLabel } = determineOrientation(
     testMetrics.testInclusionRate,
-    refactoringMetrics.refactoringRate,
+    refactoringMetrics.inlineRefactorRate,
   )
 
   return {
@@ -119,6 +156,7 @@ async function collectPrQualityInfo(owner: string, repo: string, prs: PrDetailDa
     const files = allFiles[index]
     const hasTests = files.some((f) => isTestFile(f))
     const prType = detectPrType(pr.title, pr.labels)
+    const inlineRefactor = hasInlineRefactorCommit(pr.commitHeadlines)
 
     return {
       number: pr.number,
@@ -129,11 +167,12 @@ async function collectPrQualityInfo(owner: string, repo: string, prs: PrDetailDa
       hasTests,
       prType,
       ciStatus: pr.ciStatus,
+      hasInlineRefactor: inlineRefactor,
     }
   })
 }
 
-function analyzeTestMetrics(prsWithInfo: PrWithQualityInfo[], allMergedPrs: PrDetailData[]): TestCodeMetrics {
+function analyzeTestMetrics(prsWithInfo: PrWithQualityInfo[]): TestCodeMetrics {
   const prsWithTests = prsWithInfo.filter((pr) => pr.hasTests).length
   const prsWithoutTests = prsWithInfo.length - prsWithTests
   const testInclusionRate = prsWithInfo.length > 0 ? prsWithTests / prsWithInfo.length : 0
@@ -162,8 +201,8 @@ function analyzeTestMetrics(prsWithInfo: PrWithQualityInfo[], allMergedPrs: PrDe
 
   const authorTestRate = authorTestMap.size > 0 ? authorsWithTests / authorTestMap.size : 0
 
-  // 週次トレンド（PRタイトルからテスト関連キーワードで推定）
-  const weeklyTrend = calculateWeeklyTestTrend(allMergedPrs)
+  // 週次トレンド（ファイルベース · prsWithInfo の hasTests を利用）
+  const weeklyTrend = calculateWeeklyTestTrend(prsWithInfo)
 
   // テスト文化の評価
   let testCulture: 'strong' | 'moderate' | 'weak' | 'none'
@@ -196,26 +235,18 @@ function analyzeTestMetrics(prsWithInfo: PrWithQualityInfo[], allMergedPrs: PrDe
   }
 }
 
-function calculateWeeklyTestTrend(prs: PrDetailData[]): WeeklyTestData[] {
+function calculateWeeklyTestTrend(prsWithInfo: PrWithQualityInfo[]): WeeklyTestData[] {
   const weekMap = new Map<string, { total: number; withTests: number }>()
 
-  for (const pr of prs) {
-    if (!pr.merged_at) continue
+  for (const pr of prsWithInfo) {
+    if (!pr.mergedAt) continue
 
-    const weekStart = getWeekStart(new Date(pr.merged_at))
+    const weekStart = getWeekStart(pr.mergedAt)
     const key = weekStart.toISOString()
     const current = weekMap.get(key) || { total: 0, withTests: 0 }
 
     current.total++
-
-    // タイトルからテスト関連キーワードを検出（簡易判定）
-    const lowerTitle = pr.title.toLowerCase()
-    if (
-      lowerTitle.includes('test') ||
-      lowerTitle.includes('テスト') ||
-      lowerTitle.includes('spec') ||
-      lowerTitle.includes('coverage')
-    ) {
+    if (pr.hasTests) {
       current.withTests++
     }
 
@@ -236,25 +267,56 @@ function calculateWeeklyTestTrend(prs: PrDetailData[]): WeeklyTestData[] {
   return results.sort((a, b) => a.weekStart.getTime() - b.weekStart.getTime())
 }
 
+function parseIgnoredChecks(): Set<string> {
+  const env = (process.env as Record<string, string | undefined>).VITE_CI_IGNORE_CHECKS || ''
+  return new Set(
+    env
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean),
+  )
+}
+
 function analyzeCIMetrics(prs: PrDetailData[]): CIMetrics {
+  const ignoredChecks = parseIgnoredChecks()
+  const ignoredList = Array.from(ignoredChecks)
+
   // GraphQLで取得済みのciStatusを使用（API呼び出し不要）
   let successfulChecks = 0
   let failedChecks = 0
-  let pendingChecks = 0
+  // pendingChecks は現在未使用だがカウントのみ保持
   let totalChecks = 0
+  const failingPrs: { number: number; title: string; url: string; failingChecks: string[] }[] = []
 
   const weeklyData = new Map<string, { total: number; success: number }>()
 
   for (const pr of prs) {
     if (pr.ciStatus === 'unknown') continue
 
+    // 失敗 PR について、無視リストを除いた失敗チェックを算出
+    let effectiveStatus = pr.ciStatus
+    let remainingFailing: string[] = []
+    if (pr.ciStatus === 'failure') {
+      remainingFailing = pr.ciFailingChecks.filter((c) => !ignoredChecks.has(c))
+      if (remainingFailing.length === 0 && pr.ciFailingChecks.length > 0) {
+        // 失敗が全て無視リストに含まれる → 成功扱い
+        effectiveStatus = 'success'
+      }
+    }
+
     totalChecks++
-    if (pr.ciStatus === 'success') {
+    if (effectiveStatus === 'success') {
       successfulChecks++
-    } else if (pr.ciStatus === 'failure') {
+    } else if (effectiveStatus === 'failure') {
       failedChecks++
-    } else if (pr.ciStatus === 'pending') {
-      pendingChecks++
+      failingPrs.push({
+        number: pr.number,
+        title: pr.title,
+        url: pr.html_url,
+        failingChecks: remainingFailing,
+      })
+    } else if (effectiveStatus === 'pending') {
+      // pending (not counted)
     }
 
     // 週次データ
@@ -263,7 +325,7 @@ function analyzeCIMetrics(prs: PrDetailData[]): CIMetrics {
       const key = weekStart.toISOString()
       const current = weeklyData.get(key) || { total: 0, success: 0 }
       current.total++
-      if (pr.ciStatus === 'success') {
+      if (effectiveStatus === 'success') {
         current.success++
       }
       weeklyData.set(key, current)
@@ -309,6 +371,8 @@ function analyzeCIMetrics(prs: PrDetailData[]): CIMetrics {
     successRate,
     avgFixTime: null,
     weeklyTrend,
+    failingPrs,
+    ignoredChecks: ignoredList,
     ciHealth,
     ciHealthLabel,
   }
@@ -319,11 +383,15 @@ function analyzeRefactoringMetrics(prs: PrDetailData[]): RefactoringMetrics {
   let featurePrs = 0
   let bugfixPrs = 0
   let otherPrs = 0
+  let inlineRefactorPrs = 0
+  let featFixPrsEligible = 0
+  const otherPrSamples: RefactoringMetrics['otherPrSamples'] = []
 
-  const weeklyData = new Map<string, { total: number; refactoring: number }>()
+  const weeklyData = new Map<string, { total: number; standalone: number; inline: number; eligible: number }>()
 
   for (const pr of prs) {
     const prType = detectPrType(pr.title, pr.labels)
+    const inlineRefactor = hasInlineRefactorCommit(pr.commitHeadlines)
 
     switch (prType) {
       case 'refactoring':
@@ -337,23 +405,39 @@ function analyzeRefactoringMetrics(prs: PrDetailData[]): RefactoringMetrics {
         break
       default:
         otherPrs++
+        otherPrSamples.push({
+          number: pr.number,
+          title: pr.title,
+          author: pr.user?.login || 'unknown',
+          url: pr.html_url,
+        })
+    }
+
+    // 継続的リファクタ率の対象: refactoring タイプ以外のすべて（feat/fix/other）
+    const isEligible = prType !== 'refactoring'
+    if (isEligible) {
+      featFixPrsEligible++
+      if (inlineRefactor) inlineRefactorPrs++
     }
 
     // 週次データ
     if (pr.merged_at) {
       const weekStart = getWeekStart(new Date(pr.merged_at))
       const key = weekStart.toISOString()
-      const current = weeklyData.get(key) || { total: 0, refactoring: 0 }
+      const current = weeklyData.get(key) || { total: 0, standalone: 0, inline: 0, eligible: 0 }
       current.total++
-      if (prType === 'refactoring') {
-        current.refactoring++
+      if (prType === 'refactoring') current.standalone++
+      if (isEligible) {
+        current.eligible++
+        if (inlineRefactor) current.inline++
       }
       weeklyData.set(key, current)
     }
   }
 
   const totalPrs = prs.length
-  const refactoringRate = totalPrs > 0 ? refactoringPrs / totalPrs : 0
+  const standalonePrRate = totalPrs > 0 ? refactoringPrs / totalPrs : 0
+  const inlineRefactorRate = featFixPrsEligible > 0 ? inlineRefactorPrs / featFixPrsEligible : 0
 
   // 週次トレンド
   const weeklyTrend: WeeklyRefactoringData[] = []
@@ -362,36 +446,29 @@ function analyzeRefactoringMetrics(prs: PrDetailData[]): RefactoringMetrics {
       weekStart: new Date(weekKey),
       weekLabel: formatWeekLabel(new Date(weekKey)),
       totalPrs: data.total,
-      refactoringPrs: data.refactoring,
-      refactoringRate: data.total > 0 ? data.refactoring / data.total : 0,
+      inlineRefactorPrs: data.inline,
+      standalonePrs: data.standalone,
+      inlineRate: data.eligible > 0 ? data.inline / data.eligible : 0,
+      standaloneRate: data.total > 0 ? data.standalone / data.total : 0,
     })
   }
   weeklyTrend.sort((a, b) => a.weekStart.getTime() - b.weekStart.getTime())
 
-  // 技術的負債への姿勢
-  let techDebtAttitude: 'proactive' | 'reactive' | 'neglecting'
-  let techDebtAttitudeLabel: string
-
-  if (refactoringRate >= 0.15) {
-    techDebtAttitude = 'proactive'
-    techDebtAttitudeLabel = '積極的（定期的にリファクタリング）'
-  } else if (refactoringRate >= 0.05) {
-    techDebtAttitude = 'reactive'
-    techDebtAttitudeLabel = '受動的（必要に応じてリファクタリング）'
-  } else {
-    techDebtAttitude = 'neglecting'
-    techDebtAttitudeLabel = '放置気味（リファクタリングが少ない）'
-  }
+  const { flowHealth, label: flowHealthLabel } = determineFlowHealth(inlineRefactorRate, standalonePrRate)
 
   return {
     refactoringPrs,
     featurePrs,
     bugfixPrs,
     otherPrs,
+    otherPrSamples,
     totalPrs,
-    refactoringRate,
+    inlineRefactorPrs,
+    featFixPrsEligible,
+    inlineRefactorRate,
+    standalonePrRate,
     weeklyTrend,
-    techDebtAttitude,
-    techDebtAttitudeLabel,
+    flowHealth,
+    flowHealthLabel,
   }
 }

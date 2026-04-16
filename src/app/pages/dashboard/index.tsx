@@ -3,12 +3,19 @@ import { Box, CircularProgress, Container, Paper, Stack, Tab, Tabs, Typography }
 import { RepoSwitcher } from '../../components/repo_switcher'
 import { SprintSelector } from '../../components/sprint_selector'
 import { FlowTab } from '../../components/flow'
+import { QualityTab } from '../../components/quality'
+import { TeamTab } from '../../components/team'
+import { DoraTab } from '../../components/dora'
 import { useSprint } from '../../shared/sprint/context'
 import { DashboardService } from '../../domain/services/dashboard'
 import { ReadTimes } from '../../domain/models/read_time/read.times'
 import { PrSizes } from '../../domain/models/pr_size/pr_sizes'
 import { ReviewTimes } from '../../domain/models/review_time/review_times'
 import { OpenPrs } from '../../domain/models/open_pr/open_prs'
+import { Contributors } from '../../domain/models/contributor/contributors'
+import { ReviewNetwork } from '../../domain/models/review_network/review_network'
+import { TeamMetrics } from '../../domain/models/team/team_metrics'
+import { PrDetailData } from '../../infra/github/pr_data'
 import { useActiveRepo } from '../../shared/repos/context'
 import { repoKey } from '../../shared/repos/config'
 
@@ -23,9 +30,9 @@ interface TabDef {
 
 const TABS: TabDef[] = [
   { key: 'flow', label: 'フロー', question: '速くマージできているか？', ready: true },
-  { key: 'quality', label: '品質', question: '良いやり方で作れているか？', ready: false },
-  { key: 'team', label: 'チーム', question: '健全に回っているか？', ready: false },
-  { key: 'dora', label: 'DORA', question: 'Four Keys で見るとどうか？', ready: false },
+  { key: 'quality', label: '品質', question: '良いやり方で作れているか？', ready: true },
+  { key: 'team', label: 'チーム', question: '健全に回っているか？', ready: true },
+  { key: 'dora', label: 'DORA', question: 'Four Keys で見るとどうか？', ready: true },
 ]
 
 const ComingSoon: React.FC<{ label: string }> = ({ label }) => (
@@ -56,6 +63,10 @@ export const DashboardPage: React.FC = () => {
   const [prSizes, setPrSizes] = useState<PrSizes>(new PrSizes([]))
   const [reviewTimes, setReviewTimes] = useState<ReviewTimes>(new ReviewTimes([]))
   const [openPrs, setOpenPrs] = useState<OpenPrs>(new OpenPrs([]))
+  const [contributors, setContributors] = useState<Contributors>(new Contributors([]))
+  const [reviewNetwork, setReviewNetwork] = useState<ReviewNetwork>(new ReviewNetwork([]))
+  const [teamMetrics, setTeamMetrics] = useState<TeamMetrics | null>(null)
+  const [closedPrs, setClosedPrs] = useState<PrDetailData[]>([])
   const [activeTab, setActiveTab] = useState<TabKey>('flow')
 
   useEffect(() => {
@@ -69,6 +80,10 @@ export const DashboardPage: React.FC = () => {
           setPrSizes(data.prSizes)
           setReviewTimes(data.reviewTimes)
           setOpenPrs(data.openPrs)
+          setContributors(data.contributors)
+          setReviewNetwork(data.reviewNetwork)
+          setTeamMetrics(data.teamMetrics)
+          setClosedPrs(data.closedPrs)
         }
       } catch (e) {
         console.error('Failed to fetch dashboard data:', e)
@@ -96,6 +111,23 @@ export const DashboardPage: React.FC = () => {
     switch (activeTab) {
       case 'flow':
         return <FlowTab readTimes={readTimes} prSizes={prSizes} reviewTimes={reviewTimes} openPrs={openPrs} />
+      case 'quality':
+        return <QualityTab />
+      case 'team':
+        return teamMetrics ? (
+          <TeamTab
+            contributors={contributors}
+            reviewNetwork={reviewNetwork}
+            teamMetricsAllTime={teamMetrics}
+            closedPrs={closedPrs}
+          />
+        ) : (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}>
+            <CircularProgress />
+          </Box>
+        )
+      case 'dora':
+        return <DoraTab readTimes={readTimes} closedPrs={closedPrs} />
       default: {
         const tab = TABS.find((t) => t.key === activeTab)
         return <ComingSoon label={tab?.label ?? ''} />

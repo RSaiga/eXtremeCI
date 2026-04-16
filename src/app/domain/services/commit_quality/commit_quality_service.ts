@@ -37,8 +37,22 @@ async function fetchAllCommits(repos: RepoRef[]): Promise<CommitData[]> {
   return lists.flat()
 }
 
-export async function analyzeCommitQuality(repos: RepoRef[]): Promise<CommitQualityMetrics> {
-  const commits = await fetchAllCommits(repos)
+export interface DateRange {
+  from: Date
+  to: Date
+}
+
+function filterCommitsByRange(commits: CommitData[], range?: DateRange): CommitData[] {
+  if (!range) return commits
+  return commits.filter((c) => {
+    const t = c.committedDate.getTime()
+    return t >= range.from.getTime() && t < range.to.getTime()
+  })
+}
+
+export async function analyzeCommitQuality(repos: RepoRef[], dateRange?: DateRange): Promise<CommitQualityMetrics> {
+  const allCommits = await fetchAllCommits(repos)
+  const commits = filterCommitsByRange(allCommits, dateRange)
 
   if (commits.length === 0) {
     return createEmptyMetrics()
@@ -90,8 +104,12 @@ export async function analyzeCommitQuality(repos: RepoRef[]): Promise<CommitQual
   }
 }
 
-export async function analyzeAuthorCommitQuality(repos: RepoRef[]): Promise<AuthorCommitQuality[]> {
-  const commits = await fetchAllCommits(repos)
+export async function analyzeAuthorCommitQuality(
+  repos: RepoRef[],
+  dateRange?: DateRange,
+): Promise<AuthorCommitQuality[]> {
+  const allCommits = await fetchAllCommits(repos)
+  const commits = filterCommitsByRange(allCommits, dateRange)
 
   // 著者別にグループ化
   const authorMap = new Map<string, CommitData[]>()

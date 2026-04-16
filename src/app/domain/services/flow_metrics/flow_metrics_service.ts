@@ -1,5 +1,6 @@
 import { prDataCache, PrDetailData } from '../../../infra/github/pr_data'
 import { RepoRef } from '../../../shared/repos/config'
+import { isExcludedReviewer } from '../../../shared/excluded_reviewers'
 import {
   FlowMetric,
   FlowMetricsSummary,
@@ -46,7 +47,7 @@ function formatWeekLabel(weekStart: Date): string {
   return `${month}/${day}週`
 }
 
-function buildFlowMetrics(prs: PrDetailData[]): FlowMetric[] {
+export function buildFlowMetrics(prs: PrDetailData[]): FlowMetric[] {
   const ninetyDaysAgo = NINETY_DAYS_AGO()
   const metrics: FlowMetric[] = []
 
@@ -56,6 +57,7 @@ function buildFlowMetrics(prs: PrDetailData[]): FlowMetric[] {
 
     const reviews: ReviewCycle[] = pr.reviews
       .filter((r) => r.state !== 'PENDING' && r.submitted_at)
+      .filter((r) => !isExcludedReviewer(r.user?.login))
       .map((r) => ({
         reviewer: r.user?.login || 'unknown',
         state: r.state as ReviewCycle['state'],
@@ -137,7 +139,7 @@ function calculateSummary(metrics: FlowMetric[]): FlowMetricsSummary {
   }
 }
 
-function calculateAuthorMetrics(metrics: FlowMetric[]): AuthorFlowMetrics[] {
+export function calculateAuthorMetrics(metrics: FlowMetric[]): AuthorFlowMetrics[] {
   const authorMap = new Map<string, FlowMetric[]>()
 
   for (const metric of metrics) {
@@ -171,7 +173,7 @@ function calculateAuthorMetrics(metrics: FlowMetric[]): AuthorFlowMetrics[] {
   return results.sort((a, b) => b.prCount - a.prCount)
 }
 
-function calculateReviewerMetrics(metrics: FlowMetric[]): ReviewerResponseMetrics[] {
+export function calculateReviewerMetrics(metrics: FlowMetric[]): ReviewerResponseMetrics[] {
   const reviewerMap = new Map<
     string,
     {

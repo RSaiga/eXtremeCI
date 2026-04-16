@@ -2,6 +2,7 @@ import { ReviewTimeRepository } from '../../domain/repositories/review_time'
 import { ReviewTime } from '../../domain/models/review_time/review_time'
 import { ReviewTimes } from '../../domain/models/review_time/review_times'
 import { octokit } from '../../shared/octokit'
+import { isExcludedReviewer } from '../../shared/excluded_reviewers'
 
 export class ReviewTimeRepositoryOnJson implements ReviewTimeRepository {
   find = async (owner: string, repo: string): Promise<ReviewTimes> => {
@@ -28,6 +29,7 @@ export class ReviewTimeRepositoryOnJson implements ReviewTimeRepository {
           firstReview ? new Date(firstReview.submitted_at) : null,
           firstReview?.user?.login || null,
           pr.number,
+          pr.merged_at != null,
         ),
       )
     }
@@ -39,7 +41,9 @@ export class ReviewTimeRepositoryOnJson implements ReviewTimeRepository {
     if (!reviews || !reviews.data || reviews.data.length === 0) {
       return null
     }
-    const validReviews = reviews.data.filter((r: any) => r.state !== 'PENDING' && r.submitted_at)
+    const validReviews = reviews.data
+      .filter((r: any) => r.state !== 'PENDING' && r.submitted_at)
+      .filter((r: any) => !isExcludedReviewer(r.user?.login))
     if (validReviews.length === 0) return null
 
     validReviews.sort((a: any, b: any) => new Date(a.submitted_at).getTime() - new Date(b.submitted_at).getTime())

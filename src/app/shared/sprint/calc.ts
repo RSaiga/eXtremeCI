@@ -14,7 +14,7 @@ function parseStart(config: SprintConfig): Date {
 }
 
 function formatLabel(start: Date, end: Date): string {
-  const last = new Date(end.getTime() - MS_PER_DAY)
+  const last = new Date(end.getTime() - 1)
   const fmt = (d: Date) => `${d.getMonth() + 1}/${d.getDate()}`
   return `${fmt(start)}–${fmt(last)}`
 }

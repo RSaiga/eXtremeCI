@@ -19,6 +19,9 @@ export interface PrDetailData {
   labels: string[]
   files: string[]
   ciStatus: 'success' | 'failure' | 'pending' | 'unknown'
+  ciFailingChecks: string[] // 失敗した個別チェック名
+  ciAllChecks: string[] // 全チェック名（debug 用）
+  commitHeadlines: string[] // 各コミットの messageHeadline（継続的リファクタ検出用）
 }
 
 export interface ReviewData {
@@ -50,12 +53,32 @@ query($owner: String!, $repo: String!, $closedCursor: String, $openCursor: Strin
             name
           }
         }
-        commits(first: 1) {
+        commits(first: 100) {
           nodes {
             commit {
               committedDate
+              messageHeadline
+            }
+          }
+        }
+        ciCommit: commits(last: 1) {
+          nodes {
+            commit {
               statusCheckRollup {
                 state
+                contexts(first: 100) {
+                  nodes {
+                    __typename
+                    ... on CheckRun {
+                      name
+                      conclusion
+                    }
+                    ... on StatusContext {
+                      context
+                      state
+                    }
+                  }
+                }
               }
             }
           }
@@ -92,8 +115,22 @@ query($owner: String!, $repo: String!, $closedCursor: String, $openCursor: Strin
         commits(last: 1) {
           nodes {
             commit {
+              messageHeadline
               statusCheckRollup {
                 state
+                contexts(first: 100) {
+                  nodes {
+                    __typename
+                    ... on CheckRun {
+                      name
+                      conclusion
+                    }
+                    ... on StatusContext {
+                      context
+                      state
+                    }
+                  }
+                }
               }
             }
           }
@@ -134,8 +171,24 @@ interface GraphQLPrNode {
     nodes: Array<{
       commit: {
         committedDate?: string
+        messageHeadline?: string
         statusCheckRollup?: {
           state: 'SUCCESS' | 'FAILURE' | 'PENDING' | 'ERROR' | 'EXPECTED'
+          contexts?: {
+            nodes: Array<CheckContextNode>
+          }
+        } | null
+      }
+    }>
+  }
+  ciCommit?: {
+    nodes: Array<{
+      commit: {
+        statusCheckRollup?: {
+          state: 'SUCCESS' | 'FAILURE' | 'PENDING' | 'ERROR' | 'EXPECTED'
+          contexts?: {
+            nodes: Array<CheckContextNode>
+          }
         } | null
       }
     }>
@@ -160,6 +213,40 @@ interface GraphQLResponse {
   }
 }
 
+interface CheckContextNode {
+  __typename: 'CheckRun' | 'StatusContext' | string
+  // CheckRun
+  name?: string
+  conclusion?: string | null
+  // StatusContext
+  context?: string
+  state?: string
+}
+
+function extractChecks(contexts?: { nodes: CheckContextNode[] }): {
+  failing: string[]
+  all: string[]
+} {
+  const failing: string[] = []
+  const all: string[] = []
+  if (!contexts) return { failing, all }
+  for (const c of contexts.nodes) {
+    // eslint-disable-next-line no-underscore-dangle -- GraphQL introspection field
+    if (c.__typename === 'CheckRun') {
+      const name = c.name || 'unknown'
+      all.push(name)
+      const bad = c.conclusion === 'FAILURE' || c.conclusion === 'TIMED_OUT' || c.conclusion === 'ACTION_REQUIRED'
+      if (bad) failing.push(name)
+      // eslint-disable-next-line no-underscore-dangle -- GraphQL introspection field
+    } else if (c.__typename === 'StatusContext') {
+      const name = c.context || 'unknown'
+      all.push(name)
+      if (c.state === 'FAILURE' || c.state === 'ERROR') failing.push(name)
+    }
+  }
+  return { failing, all }
+}
+
 function mapCiStatus(state?: string | null): 'success' | 'failure' | 'pending' | 'unknown' {
   if (!state) return 'unknown'
   switch (state) {
@@ -177,8 +264,10 @@ function mapCiStatus(state?: string | null): 'success' | 'failure' | 'pending' |
 }
 
 function transformPrNode(node: GraphQLPrNode): PrDetailData {
-  const lastCommit = node.commits?.nodes?.[node.commits.nodes.length - 1]
   const firstCommit = node.commits?.nodes?.[0]
+  // CI ステータスは ciCommit（last: 1 のエイリアス）優先、なければ openPrs 経路で使う commits の末尾から
+  const ciStatusCommit = node.ciCommit?.nodes?.[0] ?? node.commits?.nodes?.[node.commits.nodes.length - 1]
+  const checks = extractChecks(ciStatusCommit?.commit?.statusCheckRollup?.contexts)
 
   return {
     number: node.number,
@@ -202,7 +291,10 @@ function transformPrNode(node: GraphQLPrNode): PrDetailData {
     })),
     labels: node.labels.nodes.map((l) => l.name),
     files: [], // ファイル一覧はREST APIで別途取得が必要
-    ciStatus: mapCiStatus(lastCommit?.commit?.statusCheckRollup?.state),
+    ciStatus: mapCiStatus(ciStatusCommit?.commit?.statusCheckRollup?.state),
+    ciFailingChecks: checks.failing,
+    ciAllChecks: checks.all,
+    commitHeadlines: node.commits?.nodes?.map((n) => n.commit.messageHeadline || '').filter((h) => h.length > 0) ?? [],
   }
 }
 

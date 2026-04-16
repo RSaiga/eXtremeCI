@@ -83,9 +83,26 @@ export const FlowTab: React.FC<Props> = ({ readTimes, prSizes, reviewTimes, open
       (arr) => {
         const reviewed = arr.filter((r) => r.hasReview)
         const hours = reviewed.map((r) => r.waitTimeHours || 0)
-        return parseFloat(median(hours).toFixed(1))
+        const merged = arr.filter((r) => r.isMerged)
+        const mergedReviewed = merged.filter((r) => r.hasReview).length
+        const noReviewMerged = merged.length - mergedReviewed
+        const coverage = merged.length > 0 ? mergedReviewed / merged.length : 0
+        return {
+          median: parseFloat(median(hours).toFixed(1)),
+          coverage: parseFloat((coverage * 100).toFixed(1)),
+          noReviewMerged,
+          mergedCount: merged.length,
+        }
       },
-    ).map((p) => ({ label: p.label, index: p.index, median: p.value, count: p.count }))
+    ).map((p) => ({
+      label: p.label,
+      index: p.index,
+      median: p.value.median,
+      coverage: p.value.coverage,
+      noReviewMerged: p.value.noReviewMerged,
+      mergedCount: p.value.mergedCount,
+      count: p.count,
+    }))
 
     return {
       curReadTimes: curRT,
@@ -246,7 +263,12 @@ export const FlowTab: React.FC<Props> = ({ readTimes, prSizes, reviewTimes, open
           <PrSizeSection current={sectionPrCur} previous={sectionPrPrev} sprintSeries={prSizeSeries} />
         )}
         {sub === 'review_time' && (
-          <ReviewTimeSection current={sectionRvCur} previous={sectionRvPrev} sprintSeries={reviewSeries} />
+          <ReviewTimeSection
+            current={sectionRvCur}
+            previous={sectionRvPrev}
+            sprintSeries={reviewSeries}
+            openPrs={openPrs}
+          />
         )}
         {sub === 'open_pr' && <OpenPrSection openPrs={openPrs} />}
       </Box>

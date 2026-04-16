@@ -1,36 +1,48 @@
-import {OpenPr, ReviewState} from "./open_pr";
+import { OpenPr } from './open_pr'
 
 export interface StatusCount {
-  draft: number;
-  approved: number;
-  changesRequested: number;
-  pending: number;
-  reviewWaiting: number;
+  draft: number
+  approved: number
+  changesRequested: number
+  pending: number
+  reviewWaiting: number
 }
 
 export class OpenPrs {
-  readonly values: OpenPr[];
+  readonly values: OpenPr[]
 
   constructor(values: OpenPr[]) {
-    this.values = values;
+    this.values = values
   }
 
   get totalCount(): number {
-    return this.values.length;
+    return this.values.length
   }
 
   get staleCount(): number {
-    return this.values.filter(pr => pr.isStale).length;
+    return this.values.filter((pr) => pr.isStale).length
   }
 
   get oldCount(): number {
-    return this.values.filter(pr => pr.isOld).length;
+    return this.values.filter((pr) => pr.isOld).length
   }
 
   get avgOpenDays(): number {
-    if (this.values.length === 0) return 0;
-    const sum = this.values.reduce((acc, pr) => acc + pr.openDays, 0);
-    return parseFloat((sum / this.values.length).toFixed(1));
+    if (this.values.length === 0) return 0
+    const sum = this.values.reduce((acc, pr) => acc + pr.openDays, 0)
+    return parseFloat((sum / this.values.length).toFixed(1))
+  }
+
+  get pendingReviewPrs(): OpenPr[] {
+    return this.values.filter((pr) => !pr.isDraft && pr.reviewState === 'NONE')
+  }
+
+  get maxPendingWaitHours(): number {
+    const now = Date.now()
+    const pending = this.pendingReviewPrs
+    if (pending.length === 0) return 0
+    const hours = pending.map((pr) => (now - pr.createdAt.getTime()) / (1000 * 60 * 60))
+    return parseFloat(Math.max(...hours).toFixed(1))
   }
 
   statusCount(): StatusCount {
@@ -39,41 +51,43 @@ export class OpenPrs {
       approved: 0,
       changesRequested: 0,
       pending: 0,
-      reviewWaiting: 0
-    };
+      reviewWaiting: 0,
+    }
 
-    this.values.forEach(pr => {
+    this.values.forEach((pr) => {
       if (pr.isDraft) {
-        counts.draft++;
+        counts.draft++
       } else {
         switch (pr.reviewState) {
           case 'APPROVED':
-            counts.approved++;
-            break;
+            counts.approved++
+            break
           case 'CHANGES_REQUESTED':
-            counts.changesRequested++;
-            break;
+            counts.changesRequested++
+            break
           case 'PENDING':
-            counts.pending++;
-            break;
+            counts.pending++
+            break
           case 'COMMENTED':
-            counts.pending++;
-            break;
+            counts.pending++
+            break
           case 'NONE':
-            counts.reviewWaiting++;
-            break;
+            counts.reviewWaiting++
+            break
+          default:
+            break
         }
       }
-    });
+    })
 
-    return counts;
+    return counts
   }
 
   sortedByOpenDays(): OpenPr[] {
-    return [...this.values].sort((a, b) => b.openDays - a.openDays);
+    return [...this.values].sort((a, b) => b.openDays - a.openDays)
   }
 
   sortedByLastUpdate(): OpenPr[] {
-    return [...this.values].sort((a, b) => b.daysSinceLastUpdate - a.daysSinceLastUpdate);
+    return [...this.values].sort((a, b) => b.daysSinceLastUpdate - a.daysSinceLastUpdate)
   }
 }

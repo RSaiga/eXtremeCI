@@ -17,6 +17,8 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  ComposedChart,
+  Legend,
   Line,
   LineChart,
   ReferenceLine,
@@ -26,6 +28,7 @@ import {
   YAxis,
 } from 'recharts'
 import { ReviewTimes } from '../../domain/models/review_time/review_times'
+import { OpenPrs } from '../../domain/models/open_pr/open_prs'
 import { COLOR, DeltaBadge, formatHours, SectionHeader } from './shared'
 
 const BUCKETS = [
@@ -41,6 +44,9 @@ export interface ReviewTimeSprintPoint {
   label: string
   index: number
   median: number
+  coverage: number
+  noReviewMerged: number
+  mergedCount: number
   count: number
 }
 
@@ -48,9 +54,10 @@ interface Props {
   current: ReviewTimes
   previous: ReviewTimes
   sprintSeries: ReviewTimeSprintPoint[]
+  openPrs: OpenPrs
 }
 
-export const ReviewTimeSection: React.FC<Props> = ({ current, previous, sprintSeries }) => {
+export const ReviewTimeSection: React.FC<Props> = ({ current, previous, sprintSeries, openPrs }) => {
   const { distribution, fastRate, pendingCount } = useMemo(() => {
     const reviewed = current.reviewedPrs
     const pending = current.pendingReviewPrs.length
@@ -159,6 +166,33 @@ export const ReviewTimeSection: React.FC<Props> = ({ current, previous, sprintSe
               value={String(pendingCount)}
               color={pendingCount > 0 ? COLOR.warning : undefined}
             />
+            <StatRow
+              label="レビューカバレッジ"
+              value={`${(current.reviewCoverageRatio() * 100).toFixed(0)}%`}
+              color={
+                current.reviewCoverageRatio() >= 0.8
+                  ? COLOR.success
+                  : current.reviewCoverageRatio() >= 0.5
+                    ? COLOR.warning
+                    : COLOR.error
+              }
+            />
+            <StatRow
+              label="ノーレビューマージ"
+              value={`${current.noReviewMergeCount()} 件`}
+              color={current.noReviewMergeCount() > 0 ? COLOR.textMuted : undefined}
+            />
+            <StatRow
+              label="最長未レビュー待ち"
+              value={openPrs.maxPendingWaitHours > 0 ? formatHours(openPrs.maxPendingWaitHours) : '—'}
+              color={
+                openPrs.maxPendingWaitHours >= 72
+                  ? COLOR.error
+                  : openPrs.maxPendingWaitHours >= 24
+                    ? COLOR.warning
+                    : undefined
+              }
+            />
           </Stack>
         </Paper>
       </Box>
@@ -209,6 +243,122 @@ export const ReviewTimeSection: React.FC<Props> = ({ current, previous, sprintSe
           </ResponsiveContainer>
         </Box>
       </Paper>
+
+      <Paper variant="outlined" sx={{ p: 3, borderColor: COLOR.border, borderRadius: 2 }}>
+        <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+          レビューカバレッジ推移
+        </Typography>
+        <Typography variant="caption" sx={{ color: COLOR.textMuted }}>
+          棒: ノーレビューマージ件数 · 折れ線: マージ済PRのレビューカバレッジ率
+        </Typography>
+        <Box sx={{ height: 240, mt: 2 }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart data={sprintSeries} margin={{ top: 10, right: 20, bottom: 0, left: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+              <XAxis
+                dataKey="label"
+                tick={{ fontSize: 11, fill: COLOR.textMuted }}
+                axisLine={{ stroke: COLOR.border }}
+                tickLine={false}
+              />
+              <YAxis
+                yAxisId="count"
+                tick={{ fontSize: 11, fill: COLOR.textMuted }}
+                axisLine={false}
+                tickLine={false}
+                allowDecimals={false}
+                label={{ value: '件', angle: -90, position: 'insideLeft', fontSize: 11, fill: COLOR.textMuted }}
+              />
+              <YAxis
+                yAxisId="pct"
+                orientation="right"
+                domain={[0, 100]}
+                tick={{ fontSize: 11, fill: COLOR.textMuted }}
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={(v) => `${v}%`}
+              />
+              <Tooltip
+                contentStyle={{
+                  borderRadius: 8,
+                  border: `1px solid ${COLOR.border}`,
+                  fontSize: 12,
+                }}
+                labelFormatter={(l) => `スプリント: ${l}`}
+              />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <ReferenceLine yAxisId="pct" y={80} stroke={COLOR.success} strokeDasharray="4 4" strokeWidth={1.5} />
+              <Bar
+                yAxisId="count"
+                dataKey="noReviewMerged"
+                name="ノーレビューマージ"
+                fill={COLOR.warning}
+                radius={[4, 4, 0, 0]}
+                isAnimationActive={false}
+              />
+              <Line
+                yAxisId="pct"
+                type="monotone"
+                dataKey="coverage"
+                name="カバレッジ率"
+                stroke={COLOR.primary}
+                strokeWidth={2.5}
+                dot={{ r: 4, fill: COLOR.primary, strokeWidth: 0 }}
+                activeDot={{ r: 6 }}
+                isAnimationActive={false}
+              />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </Box>
+      </Paper>
+
+      {current.noReviewMergedPrs().length > 0 && (
+        <Paper variant="outlined" sx={{ p: 3, borderColor: COLOR.border, borderRadius: 2 }}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5 }}>
+            ノーレビューマージ一覧
+          </Typography>
+          <Typography variant="caption" sx={{ color: COLOR.textMuted }}>
+            現スコープでレビューなしにマージされた PR · 新しい順
+          </Typography>
+          <TableContainer sx={{ mt: 2 }}>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ color: COLOR.textMuted, fontWeight: 600 }}>#</TableCell>
+                  <TableCell sx={{ color: COLOR.textMuted, fontWeight: 600 }}>PR</TableCell>
+                  <TableCell sx={{ color: COLOR.textMuted, fontWeight: 600 }}>タイトル</TableCell>
+                  <TableCell sx={{ color: COLOR.textMuted, fontWeight: 600 }}>作成者</TableCell>
+                  <TableCell align="right" sx={{ color: COLOR.textMuted, fontWeight: 600 }}>
+                    作成日
+                  </TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {current.noReviewMergedPrs().map((pr, i) => (
+                  <TableRow key={pr.prNumber} sx={{ '&:last-child td': { border: 0 } }}>
+                    <TableCell sx={{ color: COLOR.textMuted }}>{i + 1}</TableCell>
+                    <TableCell sx={{ fontWeight: 500 }}>#{pr.prNumber}</TableCell>
+                    <TableCell
+                      sx={{
+                        maxWidth: 420,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {pr.prTitle}
+                    </TableCell>
+                    <TableCell>{pr.prAuthor}</TableCell>
+                    <TableCell align="right" sx={{ color: COLOR.textMuted }}>
+                      {pr.createdAtDisplay}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Paper>
+      )}
 
       {reviewerStats.length > 0 && (
         <Paper variant="outlined" sx={{ p: 3, borderColor: COLOR.border, borderRadius: 2 }}>
