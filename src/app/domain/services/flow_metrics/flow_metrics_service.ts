@@ -53,7 +53,12 @@ export function buildFlowMetrics(prs: PrDetailData[]): FlowMetric[] {
 
   for (const pr of prs) {
     const createdAt = new Date(pr.created_at)
-    if (createdAt.getTime() < ninetyDaysAgo.getTime()) continue
+    // フロータブの担当者別と基準を揃える: クローズ済みPRは「マージ/クローズ日」が90日以内であることを要件に、
+    // オープンPRは現在進行中のため常に含める。
+    const closedAtRaw = pr.merged_at || pr.closed_at
+    if (closedAtRaw) {
+      if (new Date(closedAtRaw).getTime() < ninetyDaysAgo.getTime()) continue
+    }
 
     const reviews: ReviewCycle[] = pr.reviews
       .filter((r) => r.state !== 'PENDING' && r.submitted_at)

@@ -31,9 +31,10 @@ type Scope = 'sprint' | 'all'
 interface Props {
   readTimes: ReadTimes
   closedPrs: PrDetailData[]
+  tabsNav?: React.ReactNode
 }
 
-export const DoraTab: React.FC<Props> = ({ readTimes, closedPrs }) => {
+export const DoraTab: React.FC<Props> = ({ readTimes, closedPrs, tabsNav }) => {
   const { current, previous, all } = useSprint()
   const [scope, setScope] = useState<Scope>('sprint')
 
@@ -54,6 +55,7 @@ export const DoraTab: React.FC<Props> = ({ readTimes, closedPrs }) => {
 
   return (
     <Stack spacing={3}>
+      {tabsNav}
       <SectionHeader
         overline="DORA FOUR KEYS"
         title="DORA"
@@ -195,7 +197,7 @@ const TrendCharts: React.FC<{ series: DoraSprintPoint[] }> = ({ series }) => (
       x軸 = スプリント
     </Typography>
 
-    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mt: 2 }}>
+    <Box sx={{ display: 'grid', gridTemplateColumns: '1fr', gap: 2, mt: 2 }}>
       {/* Deploy Freq */}
       <Box>
         <Typography variant="caption" sx={{ fontWeight: 600, color: COLOR.textMuted }}>

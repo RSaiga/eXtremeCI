@@ -139,15 +139,48 @@ button:disabled {
   .MuiCard-root, .MuiPaper-root {
     box-shadow: none !important;
     border: 1px solid var(--color-border-table) !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .recharts-responsive-container,
+  .recharts-wrapper,
+  .recharts-surface {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* 印刷時はチャート領域を詰めて Paper 全体が 1 ページに収まるようにする。
+     KPI カード内のスパークラインは Card 配下なので .MuiCard-root 配下で元サイズに戻す。
+     .MuiBox-root に依存しないよう div セレクタで書く。 */
+  div:has(> .recharts-responsive-container) {
+    height: 160px !important;
+    max-height: 160px !important;
+  }
+  .MuiCard-root div:has(> .recharts-responsive-container) {
+    height: 28px !important;
+    max-height: 28px !important;
+  }
+
+  /* Chrome は flex コンテナ内の子要素への break-inside: avoid を無視することがあるため、
+     印刷時は Stack の flex を解除して通常のブロック積みにする。 */
+  .MuiStack-root {
+    display: block !important;
+  }
+
+  /* Paper の内側パディングも少し詰めて高さを稼ぐ */
+  .MuiPaper-root:not(.MuiCard-root) {
+    padding: 16px !important;
   }
 
   canvas {
     max-width: 100% !important;
     max-height: 250px !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 
   .MuiBox-root {
-    height: auto !important;
     overflow: visible !important;
   }
 }

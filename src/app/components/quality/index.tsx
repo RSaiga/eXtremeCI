@@ -33,7 +33,12 @@ interface QualityBundle {
   sustain: QualitySustainabilityMetrics
 }
 
-export const QualityTab: React.FC = () => {
+interface QualityTabProps {
+  printAll?: boolean
+  tabsNav?: React.ReactNode
+}
+
+export const QualityTab: React.FC<QualityTabProps> = ({ printAll, tabsNav }) => {
   const { selectedRepos, activeRepo } = useActiveRepo()
   const { current, previous, now, all } = useSprint()
   const [loading, setLoading] = useState(true)
@@ -177,148 +182,162 @@ export const QualityTab: React.FC = () => {
   const prevTotalPrs = prevSustain ? prevSustain.refactoringMetrics.totalPrs || 1 : 0
   const prevBugfixPct = prevSustain ? Math.round((prevSustain.refactoringMetrics.bugfixPrs / prevTotalPrs) * 100) : 0
 
+  const renderSection = (key: SubTab) => {
+    switch (key) {
+      case 'commit':
+        return <CommitQualitySection metrics={metrics} authors={authors} sprintSeries={commitSeries} />
+      case 'test':
+        return <TestCiSection sustain={sustain} sprintSeries={testCiSeries} />
+      case 'sustain':
+        return <SustainabilitySection sustain={sustain} sprintSeries={sustainSeries} />
+      default:
+        return null
+    }
+  }
+
+  const screens: SubTab[] = printAll ? ['commit', 'test', 'sustain'] : [sub]
+
   return (
-    <Stack spacing={3}>
-      {/* スプリントコンテキスト + スコープトグル */}
-      <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1}>
-        <Typography variant="caption" sx={{ color: COLOR.textMuted }}>
-          現スプリント{' '}
-          <Box component="span" sx={{ fontWeight: 700, color: '#111827' }}>
-            {current.label}
-          </Box>{' '}
-          · 前スプリント {previous.label}
-        </Typography>
-        <SegmentedControl
-          value={scope}
-          onChange={setScope}
-          options={[
-            { key: 'sprint' as Scope, label: '現スプリント' },
-            { key: 'all' as Scope, label: '全期間 (90日)' },
-          ]}
-        />
-      </Stack>
+    <>
+      {screens.map((screenSub, idx) => (
+        <Stack key={screenSub} spacing={3} className={idx > 0 ? 'print-page-break' : undefined}>
+          {tabsNav}
+          {/* スプリントコンテキスト + スコープトグル */}
+          <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1}>
+            <Typography variant="caption" sx={{ color: COLOR.textMuted }}>
+              現スプリント{' '}
+              <Box component="span" sx={{ fontWeight: 700, color: '#111827' }}>
+                {current.label}
+              </Box>{' '}
+              · 前スプリント {previous.label}
+            </Typography>
+            <SegmentedControl
+              value={scope}
+              onChange={setScope}
+              options={[
+                { key: 'sprint' as Scope, label: '現スプリント' },
+                { key: 'all' as Scope, label: '全期間 (90日)' },
+              ]}
+            />
+          </Stack>
 
-      {/* KPI ストリップ */}
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(5, 1fr)' },
-          gap: 2,
-        }}
-      >
-        <KpiCard
-          label="コミット作法"
-          value={`${metrics.reviewabilityScore}`}
-          sub={
-            scope === 'sprint' && prevMetrics ? (
-              <DeltaBadge
-                current={metrics.reviewabilityScore}
-                previous={prevMetrics.reviewabilityScore}
-                invertGood={false}
-              />
-            ) : (
-              <Typography variant="caption" sx={{ color: workStyleColor, fontWeight: 700 }}>
-                {workStyle.label}
-              </Typography>
-            )
-          }
-          hint="Reviewability Score (0-100) + 働き方スタイル"
-          accent={workStyleColor}
-          active={sub === 'commit'}
-          onClick={() => setSub('commit')}
-        />
-        <KpiCard
-          label="テスト文化"
-          value={`${testPct}%`}
-          sub={
-            scope === 'sprint' && prevSustain ? (
-              <DeltaBadge current={testPct} previous={prevTestPct} invertGood={false} />
-            ) : (
-              <Typography variant="caption" sx={{ color: testCultureColor, fontWeight: 700 }}>
-                {sustain.testMetrics.testCultureLabel}
-              </Typography>
-            )
-          }
-          hint="テストを含む PR の割合"
-          accent={testCultureColor}
-          active={sub === 'test'}
-          onClick={() => setSub('test')}
-        />
-        <KpiCard
-          label="CI 健全性"
-          value={`${ciPct}%`}
-          sub={
-            scope === 'sprint' && prevSustain ? (
-              <DeltaBadge current={ciPct} previous={prevCiPct} invertGood={false} />
-            ) : (
-              <Typography variant="caption" sx={{ color: ciHealthColor, fontWeight: 700 }}>
-                {sustain.ciMetrics.ciHealthLabel}
-              </Typography>
-            )
-          }
-          hint="CI チェックの成功率"
-          accent={ciHealthColor}
-          active={sub === 'test'}
-          onClick={() => setSub('test')}
-        />
-        <KpiCard
-          label="バグ修正比率"
-          value={`${bugfixPct}%`}
-          sub={
-            scope === 'sprint' && prevSustain ? (
-              <DeltaBadge current={bugfixPct} previous={prevBugfixPct} invertGood />
-            ) : (
-              <Typography variant="caption" sx={{ color: COLOR.textMuted }}>
-                目安 ≤30%
-              </Typography>
-            )
-          }
-          hint="火消しに追われていないか"
-          accent={bugfixPct <= 20 ? COLOR.success : bugfixPct <= 30 ? COLOR.warning : COLOR.error}
-          active={sub === 'sustain'}
-          onClick={() => setSub('sustain')}
-        />
-        <KpiCard
-          label="サステナビリティ"
-          value={sustain.sustainabilityGrade}
-          sub={
-            scope === 'sprint' && prevSustain ? (
-              <DeltaBadge
-                current={sustain.sustainabilityScore}
-                previous={prevSustain.sustainabilityScore}
-                invertGood={false}
-              />
-            ) : (
-              <Typography variant="caption" sx={{ color: COLOR.textMuted }}>
-                Score {sustain.sustainabilityScore}
-              </Typography>
-            )
-          }
-          hint="テスト + CI + リファクタの総合評価"
-          accent={gradeColor}
-          active={sub === 'sustain'}
-          onClick={() => setSub('sustain')}
-        />
-      </Box>
+          {/* KPI ストリップ */}
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(5, 1fr)' },
+              gap: 2,
+            }}
+          >
+            <KpiCard
+              label="コミット作法"
+              value={`${metrics.reviewabilityScore}`}
+              sub={
+                scope === 'sprint' && prevMetrics ? (
+                  <DeltaBadge
+                    current={metrics.reviewabilityScore}
+                    previous={prevMetrics.reviewabilityScore}
+                    invertGood={false}
+                  />
+                ) : (
+                  <Typography variant="caption" sx={{ color: workStyleColor, fontWeight: 700 }}>
+                    {workStyle.label}
+                  </Typography>
+                )
+              }
+              hint="Reviewability Score (0-100) + 働き方スタイル"
+              accent={workStyleColor}
+              active={screenSub === 'commit'}
+              onClick={() => setSub('commit')}
+            />
+            <KpiCard
+              label="テスト文化"
+              value={`${testPct}%`}
+              sub={
+                scope === 'sprint' && prevSustain ? (
+                  <DeltaBadge current={testPct} previous={prevTestPct} invertGood={false} />
+                ) : (
+                  <Typography variant="caption" sx={{ color: testCultureColor, fontWeight: 700 }}>
+                    {sustain.testMetrics.testCultureLabel}
+                  </Typography>
+                )
+              }
+              hint="テストを含む PR の割合"
+              accent={testCultureColor}
+              active={screenSub === 'test'}
+              onClick={() => setSub('test')}
+            />
+            <KpiCard
+              label="CI 健全性"
+              value={`${ciPct}%`}
+              sub={
+                scope === 'sprint' && prevSustain ? (
+                  <DeltaBadge current={ciPct} previous={prevCiPct} invertGood={false} />
+                ) : (
+                  <Typography variant="caption" sx={{ color: ciHealthColor, fontWeight: 700 }}>
+                    {sustain.ciMetrics.ciHealthLabel}
+                  </Typography>
+                )
+              }
+              hint="CI チェックの成功率"
+              accent={ciHealthColor}
+              active={screenSub === 'test'}
+              onClick={() => setSub('test')}
+            />
+            <KpiCard
+              label="バグ修正比率"
+              value={`${bugfixPct}%`}
+              sub={
+                scope === 'sprint' && prevSustain ? (
+                  <DeltaBadge current={bugfixPct} previous={prevBugfixPct} invertGood />
+                ) : (
+                  <Typography variant="caption" sx={{ color: COLOR.textMuted }}>
+                    目安 ≤30%
+                  </Typography>
+                )
+              }
+              hint="火消しに追われていないか"
+              accent={bugfixPct <= 20 ? COLOR.success : bugfixPct <= 30 ? COLOR.warning : COLOR.error}
+              active={screenSub === 'sustain'}
+              onClick={() => setSub('sustain')}
+            />
+            <KpiCard
+              label="サステナビリティ"
+              value={sustain.sustainabilityGrade}
+              sub={
+                scope === 'sprint' && prevSustain ? (
+                  <DeltaBadge
+                    current={sustain.sustainabilityScore}
+                    previous={prevSustain.sustainabilityScore}
+                    invertGood={false}
+                  />
+                ) : (
+                  <Typography variant="caption" sx={{ color: COLOR.textMuted }}>
+                    Score {sustain.sustainabilityScore}
+                  </Typography>
+                )
+              }
+              hint="テスト + CI + リファクタの総合評価"
+              accent={gradeColor}
+              active={screenSub === 'sustain'}
+              onClick={() => setSub('sustain')}
+            />
+          </Box>
 
-      {/* サブタブセグメントコントロール */}
-      <SegmentedControl
-        value={sub}
-        onChange={setSub}
-        options={[
-          { key: 'commit', label: 'コミット品質' },
-          { key: 'test', label: 'テスト & CI' },
-          { key: 'sustain', label: '持続可能性' },
-        ]}
-      />
+          <SegmentedControl
+            value={screenSub}
+            onChange={setSub}
+            options={[
+              { key: 'commit', label: 'コミット品質' },
+              { key: 'test', label: 'テスト & CI' },
+              { key: 'sustain', label: '持続可能性' },
+            ]}
+          />
 
-      {/* 詳細 */}
-      <Box>
-        {sub === 'commit' && <CommitQualitySection metrics={metrics} authors={authors} sprintSeries={commitSeries} />}
-        {sub === 'test' && <TestCiSection sustain={sustain} sprintSeries={testCiSeries} />}
-        {sub === 'sustain' && <SustainabilitySection sustain={sustain} sprintSeries={sustainSeries} />}
-      </Box>
-    </Stack>
+          <Box>{renderSection(screenSub)}</Box>
+        </Stack>
+      ))}
+    </>
   )
 }
 

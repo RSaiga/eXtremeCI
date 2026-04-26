@@ -41,6 +41,7 @@ interface Props {
   reviewNetwork: ReviewNetwork
   teamMetricsAllTime: TeamMetrics
   closedPrs: PrDetailData[]
+  tabsNav?: React.ReactNode
 }
 
 type Scope = 'sprint' | 'all'
@@ -63,6 +64,7 @@ export const TeamTab: React.FC<Props> = ({
   reviewNetwork: networkAllTime,
   teamMetricsAllTime,
   closedPrs,
+  tabsNav,
 }) => {
   const { current, previous, all } = useSprint()
   const [scope, setScope] = useState<Scope>('sprint')
@@ -105,6 +107,7 @@ export const TeamTab: React.FC<Props> = ({
 
   return (
     <Stack spacing={3}>
+      {tabsNav}
       <SectionHeader
         overline="TEAM HEALTH"
         title="チーム"

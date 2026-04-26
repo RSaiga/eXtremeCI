@@ -21,9 +21,11 @@ interface Props {
   prSizes: PrSizes
   reviewTimes: ReviewTimes
   openPrs: OpenPrs
+  printAll?: boolean
+  tabsNav?: React.ReactNode
 }
 
-export const FlowTab: React.FC<Props> = ({ readTimes, prSizes, reviewTimes, openPrs }) => {
+export const FlowTab: React.FC<Props> = ({ readTimes, prSizes, reviewTimes, openPrs, printAll, tabsNav }) => {
   const { current, previous, all } = useSprint()
   const [sub, setSub] = useState<SubTab>('lead_time')
   const [scope, setScope] = useState<Scope>('sprint')
@@ -162,117 +164,128 @@ export const FlowTab: React.FC<Props> = ({ readTimes, prSizes, reviewTimes, open
             : COLOR.error
   const openAccent = openPrs.oldCount > 0 ? COLOR.error : openPrs.staleCount > 0 ? COLOR.warning : COLOR.success
 
-  return (
-    <Stack spacing={3}>
-      <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1}>
-        <Typography variant="caption" sx={{ color: COLOR.textMuted }}>
-          現スプリント{' '}
-          <Box component="span" sx={{ fontWeight: 700, color: '#111827' }}>
-            {current.label}
-          </Box>{' '}
-          · 前スプリント {previous.label}
-        </Typography>
-        <SegmentedControl
-          value={scope}
-          onChange={setScope}
-          options={[
-            { key: 'sprint' as Scope, label: '現スプリント' },
-            { key: 'all' as Scope, label: '全期間 (90日)' },
-          ]}
-        />
-      </Stack>
-
-      {/* サマリー KPI ストリップ */}
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(4, 1fr)' },
-          gap: 2,
-        }}
-      >
-        <KpiCard
-          label="リードタイム (中央値)"
-          value={formatHours(medianLead)}
-          sub={<DeltaBadge current={medianLead} previous={prevMedianLead} invertGood />}
-          hint="現スプリントの中央値 (最初のコミット→マージ)"
-          accent={leadAccent}
-          active={sub === 'lead_time'}
-          onClick={() => setSub('lead_time')}
-        />
-        <KpiCard
-          label="PR サイズ (中央値)"
-          value={medianSize ? `${formatInt(medianSize)} 行` : '—'}
-          sub={<DeltaBadge current={medianSize} previous={prevMedianSize} invertGood />}
-          hint="additions + deletions の中央値"
-          accent={sizeAccent}
-          active={sub === 'pr_size'}
-          onClick={() => setSub('pr_size')}
-        />
-        <KpiCard
-          label="レビュー待ち (中央値)"
-          value={formatHours(medianWait)}
-          sub={<DeltaBadge current={medianWait} previous={prevMedianWait} invertGood />}
-          hint="PR 作成から最初のレビューまで"
-          accent={waitAccent}
-          active={sub === 'review_time'}
-          onClick={() => setSub('review_time')}
-        />
-        <KpiCard
-          label="オープン PR"
-          value={String(openCount)}
-          sub={
-            <Typography
-              variant="caption"
-              sx={{
-                color: openPrs.oldCount > 0 ? COLOR.error : openPrs.staleCount > 0 ? COLOR.warning : COLOR.success,
-                fontWeight: 700,
-              }}
-            >
-              {openPrs.oldCount > 0
-                ? `14日超 ${openPrs.oldCount} 件`
-                : openPrs.staleCount > 0
-                  ? `7日超 ${openPrs.staleCount} 件`
-                  : '全て新しい'}
-            </Typography>
-          }
-          hint="現在未マージの PR 数 (スプリント非依存)"
-          accent={openAccent}
-          active={sub === 'open_pr'}
-          onClick={() => setSub('open_pr')}
-        />
-      </Box>
-
-      {/* サブタブセグメントコントロール */}
-      <SegmentedControl
-        value={sub}
-        onChange={setSub}
-        options={[
-          { key: 'lead_time', label: 'リードタイム' },
-          { key: 'pr_size', label: 'PR サイズ' },
-          { key: 'review_time', label: 'レビュー待ち' },
-          { key: 'open_pr', label: 'オープン PR' },
-        ]}
-      />
-
-      {/* 詳細 */}
-      <Box>
-        {sub === 'lead_time' && (
-          <LeadTimeSection current={sectionReadCur} previous={sectionReadPrev} sprintSeries={leadSeries} />
-        )}
-        {sub === 'pr_size' && (
-          <PrSizeSection current={sectionPrCur} previous={sectionPrPrev} sprintSeries={prSizeSeries} />
-        )}
-        {sub === 'review_time' && (
+  const renderSection = (key: SubTab) => {
+    switch (key) {
+      case 'lead_time':
+        return <LeadTimeSection current={sectionReadCur} previous={sectionReadPrev} sprintSeries={leadSeries} />
+      case 'pr_size':
+        return <PrSizeSection current={sectionPrCur} previous={sectionPrPrev} sprintSeries={prSizeSeries} />
+      case 'review_time':
+        return (
           <ReviewTimeSection
             current={sectionRvCur}
             previous={sectionRvPrev}
             sprintSeries={reviewSeries}
             openPrs={openPrs}
           />
-        )}
-        {sub === 'open_pr' && <OpenPrSection openPrs={openPrs} />}
-      </Box>
-    </Stack>
+        )
+      case 'open_pr':
+        return <OpenPrSection openPrs={openPrs} />
+      default:
+        return null
+    }
+  }
+
+  const screens: SubTab[] = printAll ? ['lead_time', 'pr_size', 'review_time', 'open_pr'] : [sub]
+
+  return (
+    <>
+      {screens.map((screenSub, idx) => (
+        <Stack key={screenSub} spacing={3} className={idx > 0 ? 'print-page-break' : undefined}>
+          {tabsNav}
+          <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1}>
+            <Typography variant="caption" sx={{ color: COLOR.textMuted }}>
+              現スプリント{' '}
+              <Box component="span" sx={{ fontWeight: 700, color: '#111827' }}>
+                {current.label}
+              </Box>{' '}
+              · 前スプリント {previous.label}
+            </Typography>
+            <SegmentedControl
+              value={scope}
+              onChange={setScope}
+              options={[
+                { key: 'sprint' as Scope, label: '現スプリント' },
+                { key: 'all' as Scope, label: '全期間 (90日)' },
+              ]}
+            />
+          </Stack>
+
+          {/* サマリー KPI ストリップ */}
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(4, 1fr)' },
+              gap: 2,
+            }}
+          >
+            <KpiCard
+              label="リードタイム (中央値)"
+              value={formatHours(medianLead)}
+              sub={<DeltaBadge current={medianLead} previous={prevMedianLead} invertGood />}
+              hint="現スプリントの中央値 (最初のコミット→マージ)"
+              accent={leadAccent}
+              active={screenSub === 'lead_time'}
+              onClick={() => setSub('lead_time')}
+            />
+            <KpiCard
+              label="PR サイズ (中央値)"
+              value={medianSize ? `${formatInt(medianSize)} 行` : '—'}
+              sub={<DeltaBadge current={medianSize} previous={prevMedianSize} invertGood />}
+              hint="additions + deletions の中央値"
+              accent={sizeAccent}
+              active={screenSub === 'pr_size'}
+              onClick={() => setSub('pr_size')}
+            />
+            <KpiCard
+              label="レビュー待ち (中央値)"
+              value={formatHours(medianWait)}
+              sub={<DeltaBadge current={medianWait} previous={prevMedianWait} invertGood />}
+              hint="PR 作成から最初のレビューまで"
+              accent={waitAccent}
+              active={screenSub === 'review_time'}
+              onClick={() => setSub('review_time')}
+            />
+            <KpiCard
+              label="オープン PR"
+              value={String(openCount)}
+              sub={
+                <Typography
+                  variant="caption"
+                  sx={{
+                    color: openPrs.oldCount > 0 ? COLOR.error : openPrs.staleCount > 0 ? COLOR.warning : COLOR.success,
+                    fontWeight: 700,
+                  }}
+                >
+                  {openPrs.oldCount > 0
+                    ? `14日超 ${openPrs.oldCount} 件`
+                    : openPrs.staleCount > 0
+                      ? `7日超 ${openPrs.staleCount} 件`
+                      : '全て新しい'}
+                </Typography>
+              }
+              hint="現在未マージの PR 数 (スプリント非依存)"
+              accent={openAccent}
+              active={screenSub === 'open_pr'}
+              onClick={() => setSub('open_pr')}
+            />
+          </Box>
+
+          <SegmentedControl
+            value={screenSub}
+            onChange={setSub}
+            options={[
+              { key: 'lead_time', label: 'リードタイム' },
+              { key: 'pr_size', label: 'PR サイズ' },
+              { key: 'review_time', label: 'レビュー待ち' },
+              { key: 'open_pr', label: 'オープン PR' },
+            ]}
+          />
+
+          <Box>{renderSection(screenSub)}</Box>
+        </Stack>
+      ))}
+    </>
   )
 }
 

@@ -1,0 +1,74 @@
+/* 印刷専用スタイル (Cmd+P / Save as PDF 時のみ適用)
+   方針: 画面レイアウトを極力そのまま維持し、ページ跨ぎ防止のみ行う。 */
+@media print {
+  /* 色を画面と同じに保つ */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  @page {
+    size: A4 landscape;
+    margin: 10mm;
+  }
+
+  /* .no-print を付けた要素は印刷時に隠す (必要な時だけ使う) */
+  .no-print {
+    display: none !important;
+  }
+
+  /* 全タブ印刷モードではサブタブのセグメントコントロールも見えない方が綺麗なので、
+     各タブコンポーネント側で printAll 時は描画しない前提 (コード側で制御済み)。 */
+
+  /* 各画面境界で強制改ページ (FlowTab / QualityTab のサブセクション境界 +
+     DashboardPage のタブ境界) */
+  .print-page-break {
+    page-break-before: always !important;
+    break-before: page !important;
+  }
+
+  /* Paper / Card がページを跨がないようにする。
+     Chrome は flex 子孫の break-inside: avoid を稀に無視するが、
+     block コンテキストである Paper 本体に効けば十分なケースが多い。 */
+  .MuiCard-root,
+  .MuiPaper-root {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* recharts 本体もブレーク禁止 (SVG がページで切れるのを防ぐ) */
+  .recharts-responsive-container,
+  .recharts-wrapper,
+  .recharts-surface {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* canvas (Chart.js) も同様 */
+  canvas {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Chrome の print モードでは MUI の `md` ブレークポイント (min-width: 900px) が
+     期待通りに効かず、KPI ストリップが xs レイアウト (縦積み / 2x2) になってしまう。
+     画面表示と同じ横並びを維持するため、直下の Card / Paper 数に応じて
+     grid のカラム数を明示する。 */
+  .MuiBox-root:has(> .MuiCard-root):has(> *:nth-child(5):last-child),
+  .MuiBox-root:has(> .MuiPaper-root):has(> *:nth-child(5):last-child) {
+    display: grid !important;
+    grid-template-columns: repeat(5, 1fr) !important;
+    gap: 16px !important;
+  }
+  .MuiBox-root:has(> .MuiCard-root):has(> *:nth-child(4):last-child),
+  .MuiBox-root:has(> .MuiPaper-root):has(> *:nth-child(4):last-child) {
+    display: grid !important;
+    grid-template-columns: repeat(4, 1fr) !important;
+    gap: 16px !important;
+  }
+  .MuiBox-root:has(> .MuiPaper-root):has(> *:nth-child(3):last-child) {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 16px !important;
+  }
+}

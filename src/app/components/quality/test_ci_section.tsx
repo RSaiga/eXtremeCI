@@ -167,11 +167,11 @@ export const TestCiSection: React.FC<Props> = ({ sustain, sprintSeries }) => {
         />
       </Box>
 
-      {/* 左: テスト週次トレンド、右: CI Donut */}
+      {/* テスト週次トレンド (横幅いっぱい) + CI Donut (下に縦積み) */}
       <Box
         sx={{
           display: 'grid',
-          gridTemplateColumns: { xs: '1fr', md: '5fr 3fr' },
+          gridTemplateColumns: '1fr',
           gap: 3,
         }}
       >

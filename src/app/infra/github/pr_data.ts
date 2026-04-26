@@ -30,10 +30,22 @@ export interface ReviewData {
   submitted_at: string
 }
 
-const GRAPHQL_QUERY = `
-query($owner: String!, $repo: String!, $closedCursor: String, $openCursor: String) {
+// 90日前を境界にページネーションを打ち切るためのしきい値
+const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000
+
+// 暴走防止: 90日以内に数千件PRがあるリポジトリでも上限を設ける
+const CLOSED_PR_PAGE_SIZE = 100
+const MAX_CLOSED_PR_PAGES = 20 // = 最大 2000件
+const OPEN_PR_PAGE_SIZE = 100
+
+const CLOSED_PRS_QUERY = `
+query($owner: String!, $repo: String!, $cursor: String) {
   repository(owner: $owner, name: $repo) {
-    closedPrs: pullRequests(last: 50, states: [CLOSED, MERGED], before: $closedCursor) {
+    pullRequests(last: ${CLOSED_PR_PAGE_SIZE}, states: [CLOSED, MERGED], before: $cursor) {
+      pageInfo {
+        hasPreviousPage
+        startCursor
+      }
       nodes {
         number
         title
@@ -83,7 +95,7 @@ query($owner: String!, $repo: String!, $closedCursor: String, $openCursor: Strin
             }
           }
         }
-        reviews(first: 10) {
+        reviews(first: 100) {
           nodes {
             author { login }
             state
@@ -92,7 +104,14 @@ query($owner: String!, $repo: String!, $closedCursor: String, $openCursor: Strin
         }
       }
     }
-    openPrs: pullRequests(last: 50, states: [OPEN], before: $openCursor) {
+  }
+}
+`
+
+const OPEN_PRS_QUERY = `
+query($owner: String!, $repo: String!) {
+  repository(owner: $owner, name: $repo) {
+    pullRequests(last: ${OPEN_PR_PAGE_SIZE}, states: [OPEN]) {
       nodes {
         number
         title
@@ -135,7 +154,7 @@ query($owner: String!, $repo: String!, $closedCursor: String, $openCursor: Strin
             }
           }
         }
-        reviews(first: 10) {
+        reviews(first: 100) {
           nodes {
             author { login }
             state
@@ -202,12 +221,21 @@ interface GraphQLPrNode {
   }
 }
 
-interface GraphQLResponse {
+interface ClosedPrsResponse {
   repository: {
-    closedPrs: {
+    pullRequests: {
+      pageInfo: {
+        hasPreviousPage: boolean
+        startCursor: string | null
+      }
       nodes: GraphQLPrNode[]
     }
-    openPrs: {
+  }
+}
+
+interface OpenPrsResponse {
+  repository: {
+    pullRequests: {
       nodes: GraphQLPrNode[]
     }
   }
@@ -307,6 +335,10 @@ interface PrCacheEntry {
 class GitHubPrDataCache {
   private entries = new Map<string, PrCacheEntry>()
 
+  // 同一リポジトリに対して getClosedPrs/getOpenPrs が同時に呼ばれたときに
+  // fetchAllData を重複発火させないための in-flight プロミスマップ
+  private inFlight = new Map<string, Promise<PrCacheEntry>>()
+
   private readonly CACHE_TTL = 60000 // 1分キャッシュ
 
   async getClosedPrs(owner: string, repo: string): Promise<PrDetailData[]> {
@@ -325,7 +357,11 @@ class GitHubPrDataCache {
     if (existing && Date.now() - existing.lastFetch < this.CACHE_TTL) {
       return existing
     }
-    return await this.fetchAllData(owner, repo)
+    const pending = this.inFlight.get(key)
+    if (pending) return pending
+    const p = this.fetchAllData(owner, repo).finally(() => this.inFlight.delete(key))
+    this.inFlight.set(key, p)
+    return p
   }
 
   private async fetchAllData(owner: string, repo: string): Promise<PrCacheEntry> {
@@ -333,28 +369,65 @@ class GitHubPrDataCache {
     const startTime = Date.now()
     const key = `${owner}/${repo}`
 
-    try {
-      const response = await octokit.graphql<GraphQLResponse>(GRAPHQL_QUERY, {
+    // closed/open は独立に解決させる。片方が失敗しても、もう片方の結果は捨てない。
+    const [closedResult, openResult] = await Promise.allSettled([
+      this.fetchClosedPrs(owner, repo),
+      this.fetchOpenPrs(owner, repo),
+    ])
+
+    if (closedResult.status === 'rejected') {
+      console.error(`Failed to fetch closed PRs for ${owner}/${repo}:`, closedResult.reason)
+    }
+    if (openResult.status === 'rejected') {
+      console.error(`Failed to fetch open PRs for ${owner}/${repo}:`, openResult.reason)
+    }
+
+    const closedNodes = closedResult.status === 'fulfilled' ? closedResult.value : []
+    const openNodes = openResult.status === 'fulfilled' ? openResult.value : []
+
+    const entry: PrCacheEntry = {
+      closedPrs: closedNodes.map(transformPrNode),
+      openPrs: openNodes.map(transformPrNode),
+      lastFetch: Date.now(),
+    }
+    this.entries.set(key, entry)
+
+    const elapsed = Date.now() - startTime
+    console.log(`PR data loaded in ${elapsed}ms (${entry.closedPrs.length} closed, ${entry.openPrs.length} open)`)
+    return entry
+  }
+
+  private async fetchClosedPrs(owner: string, repo: string): Promise<GraphQLPrNode[]> {
+    const collected: GraphQLPrNode[] = []
+    const cutoff = Date.now() - NINETY_DAYS_MS
+    let cursor: string | null = null
+
+    for (let page = 0; page < MAX_CLOSED_PR_PAGES; page += 1) {
+      // eslint-disable-next-line no-await-in-loop -- backward cursor pagination is inherently sequential
+      const response = await octokit.graphql<ClosedPrsResponse>(CLOSED_PRS_QUERY, {
         owner,
         repo,
+        cursor,
       })
+      const { nodes, pageInfo } = response.repository.pullRequests
+      if (nodes.length === 0) break
+      collected.push(...nodes)
 
-      const entry: PrCacheEntry = {
-        closedPrs: response.repository.closedPrs.nodes.map(transformPrNode),
-        openPrs: response.repository.openPrs.nodes.map(transformPrNode),
-        lastFetch: Date.now(),
-      }
-      this.entries.set(key, entry)
-
-      const elapsed = Date.now() - startTime
-      console.log(`PR data loaded in ${elapsed}ms (${entry.closedPrs.length} closed, ${entry.openPrs.length} open)`)
-      return entry
-    } catch (e) {
-      console.error('Failed to fetch PR data via GraphQL:', e)
-      const empty: PrCacheEntry = { closedPrs: [], openPrs: [], lastFetch: Date.now() }
-      this.entries.set(key, empty)
-      return empty
+      // nodes は ASC 順（古い→新しい）で返る。先頭が最古。
+      const oldestCreatedAt = new Date(nodes[0].createdAt).getTime()
+      if (oldestCreatedAt < cutoff) break
+      if (!pageInfo.hasPreviousPage || !pageInfo.startCursor) break
+      cursor = pageInfo.startCursor
     }
+    return collected
+  }
+
+  private async fetchOpenPrs(owner: string, repo: string): Promise<GraphQLPrNode[]> {
+    const response = await octokit.graphql<OpenPrsResponse>(OPEN_PRS_QUERY, {
+      owner,
+      repo,
+    })
+    return response.repository.pullRequests.nodes
   }
 
   clearCache(owner?: string, repo?: string): void {

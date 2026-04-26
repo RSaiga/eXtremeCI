@@ -83,6 +83,8 @@ function buildReviewTimes(closedPrs: PrDetailData[]): ReviewTimes {
     const createdAt = new Date(pr.created_at)
     if (createdAt.getTime() < ninetyDaysAgo.getTime()) continue
 
+    const author = pr.user?.login || 'unknown'
+
     const validReviews = pr.reviews
       .filter((r) => r.state !== 'PENDING' && r.submitted_at)
       .filter((r) => !isExcludedReviewer(r.user?.login))
@@ -90,15 +92,30 @@ function buildReviewTimes(closedPrs: PrDetailData[]): ReviewTimes {
 
     const firstReview = validReviews[0]
 
+    // レビュアー毎の「初回レスポンス時間」を算出（自己レビューは除外）
+    const firstPerReviewer = new Map<string, number>()
+    for (const r of validReviews) {
+      const login = r.user?.login
+      if (!login) continue
+      if (login === author) continue
+      if (firstPerReviewer.has(login)) continue
+      const waitHours = parseFloat(
+        ((new Date(r.submitted_at).getTime() - createdAt.getTime()) / (1000 * 60 * 60)).toFixed(2),
+      )
+      firstPerReviewer.set(login, waitHours)
+    }
+    const reviewerResponses = Array.from(firstPerReviewer, ([reviewer, waitHours]) => ({ reviewer, waitHours }))
+
     reviewTimes.push(
       new ReviewTime(
         pr.title,
-        pr.user?.login || 'unknown',
+        author,
         createdAt,
         firstReview ? new Date(firstReview.submitted_at) : null,
         firstReview?.user?.login || null,
         pr.number,
         pr.merged_at !== null,
+        reviewerResponses,
       ),
     )
   }

@@ -61,15 +61,15 @@ export class ReviewTimes {
   }
 
   reviewerStats(): ReviewerStats[] {
-    const reviewed = this.reviewedPrs
     const reviewerMap = new Map<string, { totalHours: number; count: number }>()
 
-    reviewed.forEach((pr) => {
-      if (pr.firstReviewer) {
-        const existing = reviewerMap.get(pr.firstReviewer) || { totalHours: 0, count: 0 }
-        existing.totalHours += pr.waitTimeHours || 0
+    // 1PR につき全レビュアーを集計（レビュアー毎の「初回レスポンス時間」ベース）
+    this.values.forEach((pr) => {
+      for (const r of pr.reviewerResponses) {
+        const existing = reviewerMap.get(r.reviewer) || { totalHours: 0, count: 0 }
+        existing.totalHours += r.waitHours
         existing.count += 1
-        reviewerMap.set(pr.firstReviewer, existing)
+        reviewerMap.set(r.reviewer, existing)
       }
     })
 
