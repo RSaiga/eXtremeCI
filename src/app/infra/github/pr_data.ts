@@ -22,6 +22,7 @@ export interface PrDetailData {
   ciFailingChecks: string[] // 失敗した個別チェック名
   ciAllChecks: string[] // 全チェック名（debug 用）
   commitHeadlines: string[] // 各コミットの messageHeadline（継続的リファクタ検出用）
+  commitCount: number
 }
 
 export interface ReviewData {
@@ -66,6 +67,7 @@ query($owner: String!, $repo: String!, $cursor: String) {
           }
         }
         commits(first: 100) {
+          totalCount
           nodes {
             commit {
               committedDate
@@ -187,6 +189,7 @@ interface GraphQLPrNode {
     }>
   }
   commits?: {
+    totalCount?: number
     nodes: Array<{
       commit: {
         committedDate?: string
@@ -323,6 +326,7 @@ function transformPrNode(node: GraphQLPrNode): PrDetailData {
     ciFailingChecks: checks.failing,
     ciAllChecks: checks.all,
     commitHeadlines: node.commits?.nodes?.map((n) => n.commit.messageHeadline || '').filter((h) => h.length > 0) ?? [],
+    commitCount: node.commits?.totalCount ?? node.commits?.nodes?.length ?? 0,
   }
 }
 

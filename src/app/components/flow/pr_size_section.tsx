@@ -1,5 +1,18 @@
 import React, { useMemo } from 'react'
-import { Box, Paper, Stack, Typography } from '@mui/material'
+import {
+  Box,
+  Chip,
+  Link,
+  Paper,
+  Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Typography,
+} from '@mui/material'
 import {
   Bar,
   BarChart,
@@ -14,7 +27,16 @@ import {
   YAxis,
 } from 'recharts'
 import { PrSizes } from '../../domain/models/pr_size/pr_sizes'
+import { SizeCategory } from '../../domain/models/pr_size/pr_size'
 import { COLOR, DeltaBadge, formatInt, SectionHeader } from './shared'
+
+const SIZE_CHIP_COLOR: Record<SizeCategory, string> = {
+  XS: COLOR.success,
+  S: '#4caf50',
+  M: COLOR.primary,
+  L: COLOR.warning,
+  XL: COLOR.error,
+}
 
 const SIZE_ORDER: Array<{
   key: 'XS' | 'S' | 'M' | 'L' | 'XL'
@@ -256,7 +278,110 @@ export const PrSizeSection: React.FC<Props> = ({ current, previous, sprintSeries
           </Stack>
         </Paper>
       </Box>
+
+      <PrSizeDetailTable prSizes={current.values} />
     </Stack>
+  )
+}
+
+const PrSizeDetailTable: React.FC<{ prSizes: ReadonlyArray<import('../../domain/models/pr_size/pr_size').PrSize> }> = ({
+  prSizes,
+}) => {
+  const sorted = useMemo(() => [...prSizes].sort((a, b) => b.totalChanges - a.totalChanges), [prSizes])
+
+  return (
+    <Paper variant="outlined" sx={{ borderColor: COLOR.border, borderRadius: 2, overflow: 'hidden' }}>
+      <Box sx={{ p: 3, pb: 2 }}>
+        <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+          明細
+        </Typography>
+        <Typography variant="caption" sx={{ color: COLOR.textMuted }}>
+          PR ごとの変更行数・担当者・コミット数 · 変更行数の多い順 · 全 {sorted.length} 件
+        </Typography>
+      </Box>
+      <TableContainer>
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell sx={{ fontWeight: 700, color: COLOR.textMuted, bgcolor: COLOR.bgSoft }}>タイトル</TableCell>
+              <TableCell sx={{ fontWeight: 700, color: COLOR.textMuted, bgcolor: COLOR.bgSoft }}>担当者</TableCell>
+              <TableCell sx={{ fontWeight: 700, color: COLOR.textMuted, bgcolor: COLOR.bgSoft }}>日付</TableCell>
+              <TableCell align="right" sx={{ fontWeight: 700, color: COLOR.textMuted, bgcolor: COLOR.bgSoft }}>
+                追加
+              </TableCell>
+              <TableCell align="right" sx={{ fontWeight: 700, color: COLOR.textMuted, bgcolor: COLOR.bgSoft }}>
+                削除
+              </TableCell>
+              <TableCell align="right" sx={{ fontWeight: 700, color: COLOR.textMuted, bgcolor: COLOR.bgSoft }}>
+                合計
+              </TableCell>
+              <TableCell align="right" sx={{ fontWeight: 700, color: COLOR.textMuted, bgcolor: COLOR.bgSoft }}>
+                ファイル
+              </TableCell>
+              <TableCell align="right" sx={{ fontWeight: 700, color: COLOR.textMuted, bgcolor: COLOR.bgSoft }}>
+                コミット
+              </TableCell>
+              <TableCell sx={{ fontWeight: 700, color: COLOR.textMuted, bgcolor: COLOR.bgSoft }}>サイズ</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {sorted.map((row) => {
+              const sizeColor = SIZE_CHIP_COLOR[row.sizeCategory]
+              return (
+                <TableRow key={row.number} hover>
+                  <TableCell sx={{ maxWidth: 360 }}>
+                    {row.htmlUrl ? (
+                      <Link
+                        href={row.htmlUrl}
+                        target="_blank"
+                        rel="noopener"
+                        underline="hover"
+                        sx={{ wordBreak: 'break-word' }}
+                      >
+                        {row.title}
+                      </Link>
+                    ) : (
+                      <Typography variant="body2" sx={{ wordBreak: 'break-word' }}>
+                        {row.title}
+                      </Typography>
+                    )}
+                  </TableCell>
+                  <TableCell sx={{ whiteSpace: 'nowrap' }}>{row.user}</TableCell>
+                  <TableCell sx={{ whiteSpace: 'nowrap', color: COLOR.textMuted }}>{row.date}</TableCell>
+                  <TableCell align="right" sx={{ color: COLOR.success, fontVariantNumeric: 'tabular-nums' }}>
+                    +{formatInt(row.additions)}
+                  </TableCell>
+                  <TableCell align="right" sx={{ color: COLOR.error, fontVariantNumeric: 'tabular-nums' }}>
+                    -{formatInt(row.deletions)}
+                  </TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+                    {formatInt(row.totalChanges)}
+                  </TableCell>
+                  <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+                    {formatInt(row.changedFiles)}
+                  </TableCell>
+                  <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+                    {formatInt(row.commitCount)}
+                  </TableCell>
+                  <TableCell>
+                    <Chip
+                      label={row.sizeCategory}
+                      size="small"
+                      sx={{
+                        bgcolor: sizeColor,
+                        color: '#fff',
+                        fontWeight: 700,
+                        height: 22,
+                      }}
+                    />
+                  </TableCell>
+                </TableRow>
+              )
+            })}
+          </TableBody>
+        </Table>
+      </TableContainer>
+    </Paper>
   )
 }
 

@@ -68,6 +68,9 @@ function buildPrSizes(closedPrs: PrDetailData[]): PrSizes {
         pr.additions,
         pr.deletions,
         pr.changed_files,
+        pr.number,
+        pr.html_url,
+        pr.commitCount,
       ),
     )
   }

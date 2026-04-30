@@ -29,6 +29,9 @@ export class PrSizeRepositoryOnJson implements PrSizeRepository {
           detail.data.additions,
           detail.data.deletions,
           detail.data.changed_files,
+          data.number,
+          data.html_url || '',
+          detail.data.commits ?? 0,
         ),
       )
     }
