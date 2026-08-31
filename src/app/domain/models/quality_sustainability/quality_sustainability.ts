@@ -15,6 +15,17 @@ export interface QualitySustainabilityMetrics {
   sustainabilityGrade: 'A' | 'B' | 'C' | 'D' | 'F'
   orientation: 'long-term' | 'short-term' | 'balanced'
   orientationLabel: string
+
+  // PR ごとのテスト/プロダクション コード変更量と作成者の集計
+  prsCodeBreakdown: PrWithQualityInfo[]
+  authorsTestStats: AuthorTestStats[]
+}
+
+export interface AuthorTestStats {
+  author: string
+  prsWithTests: number
+  totalPrs: number
+  testRate: number // 0-1
 }
 
 export interface TestCodeMetrics {
@@ -128,10 +139,13 @@ export interface WeeklyRefactoringData {
 export interface PrWithQualityInfo {
   number: number
   title: string
+  url: string
   author: string
   createdAt: Date
   mergedAt: Date | null
   hasTests: boolean
+  testCodeLines: number // テストファイルの additions + deletions
+  productionCodeLines: number // 非テストファイルの additions + deletions
   prType: 'feature' | 'bugfix' | 'refactoring' | 'other'
   ciStatus: 'success' | 'failure' | 'pending' | 'unknown'
   hasInlineRefactor: boolean
@@ -247,13 +261,16 @@ export const PR_TYPE_KEYWORDS = {
     '簡略化',
     'optimize',
     '最適化',
-    'chore',
+    // 'chore' は除外: dependabot の "chore(deps): ..." 等が refactoring に誤分類され、
+    // リファクタ率・standalone率を水増しするため。chore は 'other' 扱いとする。
   ],
   bugfix: [
-    'fix',
+    // 単独の「修正」「fix」は過剰検出（"変更/改訂"、"prefix/suffix/fixture" 等）になるため bugfix には含めない。
+    // 本物のバグ修正は Conventional Commits の "fix:/hotfix:" プレフィックス（高精度）と、下記のバグ固有語で拾う。
     'bug',
     'バグ',
-    '修正',
+    '不具合',
+    '障害',
     'hotfix',
     'patch',
     'issue',
@@ -308,6 +325,45 @@ export const PR_LABEL_MAPPINGS = {
   ],
   bugfix: ['bug', 'bugfix', 'bug-fix', 'fix', 'hotfix', 'hot-fix', 'patch', 'issue'],
   feature: ['feature', 'feat', 'enhancement', 'new-feature', 'new feature', 'addition'],
+}
+
+// Hotfix（緊急修正）判定用キーワード。
+// bugfix のサブセットだが、「本番の障害を止める／緊急でリリースする」変更を独立して検知する。
+// 日本語・英語の両方に対応し、判定は大文字小文字を無視する（下の isHotfixPr で toLowerCase 比較）。
+export const HOTFIX_KEYWORDS = [
+  // 英語
+  'hotfix',
+  'hot-fix',
+  'hot fix',
+  'incident',
+  'outage',
+  'urgent',
+  'emergency',
+  'rollback',
+  // 日本語
+  'ホットフィックス',
+  '緊急', // 緊急リリース / 緊急対応 / 緊急修正 を包含
+  '至急',
+  '障害', // 障害対応 / 本番障害 を包含
+  'インシデント',
+  'ロールバック',
+  '切り戻し',
+  '緊急リリース',
+] as const
+
+// Conventional Commits の hotfix プレフィックス（例: "hotfix: ...", "hotfix(scope): ..."）
+const HOTFIX_CC_PATTERN = /^hotfix(\(.+\))?:/i
+
+// タイトル・ラベルから hotfix（緊急修正）かどうかを判定する。
+// 大文字小文字は無視。日本語（障害/緊急/至急/切り戻し 等）・英語（urgent/incident/rollback 等）の両方に対応。
+export function isHotfixPr(title: string, labels: string[] = []): boolean {
+  if (HOTFIX_CC_PATTERN.test(title)) return true
+  const lowerTitle = title.toLowerCase()
+  const lowerLabels = labels.map((l) => l.toLowerCase())
+  return HOTFIX_KEYWORDS.some((kw) => {
+    const k = kw.toLowerCase()
+    return lowerTitle.includes(k) || lowerLabels.some((l) => l.includes(k))
+  })
 }
 
 export function detectPrType(title: string, labels: string[] = []): 'feature' | 'bugfix' | 'refactoring' | 'other' {

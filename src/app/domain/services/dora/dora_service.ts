@@ -1,7 +1,8 @@
 import { PrDetailData } from '../../../infra/github/pr_data'
 import { ReadTimes } from '../../models/read_time/read.times'
 import { SprintRange } from '../../../shared/sprint/calc'
-import { detectPrType } from '../../models/quality_sustainability/quality_sustainability'
+import { isProductionMerge } from '../../../shared/pr_classification'
+import { detectPrType, isHotfixPr } from '../../models/quality_sustainability/quality_sustainability'
 import {
   DoraMetrics,
   DoraSprintPoint,
@@ -43,8 +44,11 @@ function calculate(closedPrs: PrDetailData[], readTimes: ReadTimes, startMs: num
   const scopedReadTimes = filterReadTimesInRange(readTimes, startMs, endMs)
 
   // 1. Deployment Frequency
+  // 「デプロイ = 本番ブランチへのマージ（または release PR）」で数える。
+  // staging への feature PR 等を1デプロイに数える過大計上を避け、実リリース頻度を反映する。
   const days = Math.max(1, (endMs - startMs) / MS_PER_DAY)
-  const deployFreqValue = merged.length / days
+  const deployments = merged.filter((pr) => isProductionMerge(pr))
+  const deployFreqValue = deployments.length / days
   const deployFreqLevel = getDeployFreqLevel(deployFreqValue)
 
   // 2. Lead Time for Changes
@@ -59,40 +63,28 @@ function calculate(closedPrs: PrDetailData[], readTimes: ReadTimes, startMs: num
   const failurePrs: DoraMetrics['changeFailureRate']['failurePrs'] = []
 
   for (const pr of merged) {
-    const prType = detectPrType(pr.title, pr.labels)
-    if (prType === 'bugfix') {
-      bugfixCount++
-      failurePrs.push({
-        number: pr.number,
-        title: pr.title,
-        author: pr.user?.login || 'unknown',
-        prType: 'bugfix',
-      })
+    const author = pr.user?.login || 'unknown'
+    // hotfix（障害/緊急リリース/緊急対応/切り戻し 等）を最優先で独立判定する。
+    // bugfix 判定より先に評価し、二重計上を防ぐ（hotfix にマッチしたら bugfix には数えない）。
+    if (isHotfixPr(pr.title, pr.labels)) {
+      hotfixCount++
+      failurePrs.push({ number: pr.number, title: pr.title, author, prType: 'hotfix' })
+      continue
     }
-  }
-  // hotfix = bugfix のサブセット（タイトルに hotfix を含むもの）
-  for (const pr of merged) {
-    if (/^(hotfix|fix)(\(.+\))?:/i.test(pr.title) || pr.title.toLowerCase().includes('hotfix')) {
-      if (!failurePrs.some((f) => f.number === pr.number)) {
-        hotfixCount++
-        failurePrs.push({
-          number: pr.number,
-          title: pr.title,
-          author: pr.user?.login || 'unknown',
-          prType: 'hotfix',
-        })
-      }
+    if (detectPrType(pr.title, pr.labels) === 'bugfix') {
+      bugfixCount++
+      failurePrs.push({ number: pr.number, title: pr.title, author, prType: 'bugfix' })
     }
   }
 
   const cfrValue = merged.length > 0 ? (bugfixCount + hotfixCount) / merged.length : 0
   const cfrLevel = getCfrLevel(cfrValue)
 
-  // 4. MTTR
+  // 4. MTTR（復旧＝hotfix + bugfix のマージ所要時間の中央値）
   const bugfixMergeTimes: number[] = []
   for (const pr of merged) {
-    const prType = detectPrType(pr.title, pr.labels)
-    if (prType === 'bugfix' && pr.merged_at) {
+    const isFailureFix = isHotfixPr(pr.title, pr.labels) || detectPrType(pr.title, pr.labels) === 'bugfix'
+    if (isFailureFix && pr.merged_at) {
       const hours = (new Date(pr.merged_at).getTime() - new Date(pr.created_at).getTime()) / MS_PER_HOUR
       if (hours >= 0) bugfixMergeTimes.push(hours)
     }

@@ -56,7 +56,7 @@ const CI_HEALTH_COLOR: Record<string, string> = {
 }
 
 export const TestCiSection: React.FC<Props> = ({ sustain, sprintSeries }) => {
-  const { testMetrics, ciMetrics } = sustain
+  const { testMetrics, ciMetrics, prsCodeBreakdown, authorsTestStats } = sustain
   const testColor = TEST_CULTURE_COLOR[testMetrics.testCulture] || COLOR.textMuted
   const ciColor = CI_HEALTH_COLOR[ciMetrics.ciHealth] || COLOR.textMuted
 
@@ -128,7 +128,7 @@ export const TestCiSection: React.FC<Props> = ({ sustain, sprintSeries }) => {
               {formatInt(testMetrics.prsWithTests + testMetrics.prsWithoutTests)}
             </Sub>
           }
-          hint="PR にテストコードの変更が含まれる割合"
+          hint="PR にテストコードの変更が含まれる割合（各リポジトリ直近30件の標本値であり、全マージPRやノーレビューPRの母集団比率ではない。ノーレビューPRのテスト担保率はフロータブの「レビュー×テスト クロス集計」を参照）"
           accent={testInclusionPct >= 70 ? COLOR.success : testInclusionPct >= 40 ? COLOR.warning : COLOR.error}
         />
         <KpiCard
@@ -285,6 +285,144 @@ export const TestCiSection: React.FC<Props> = ({ sustain, sprintSeries }) => {
           </Stack>
         </Paper>
       </Box>
+
+      {/* PR 別 コード変更量 */}
+      <Paper variant="outlined" sx={{ p: 3, borderColor: COLOR.border, borderRadius: 2 }}>
+        <Box mb={1}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+            PR 別 コード変更量
+          </Typography>
+          <Typography variant="caption" sx={{ color: COLOR.textMuted }}>
+            テストコードとプロダクションコードの変更行数 (additions + deletions) · {prsCodeBreakdown.length} 件
+          </Typography>
+        </Box>
+        {prsCodeBreakdown.length > 0 ? (
+          <TableContainer sx={{ mt: 2 }}>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ color: COLOR.textMuted, fontWeight: 600 }}>PR</TableCell>
+                  <TableCell sx={{ color: COLOR.textMuted, fontWeight: 600 }}>タイトル</TableCell>
+                  <TableCell sx={{ color: COLOR.textMuted, fontWeight: 600 }}>作成者</TableCell>
+                  <TableCell sx={{ color: COLOR.textMuted, fontWeight: 600 }} align="right">
+                    テストコード変更行数
+                  </TableCell>
+                  <TableCell sx={{ color: COLOR.textMuted, fontWeight: 600 }} align="right">
+                    プロダクションコード変更行数
+                  </TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {prsCodeBreakdown.map((p) => (
+                  <TableRow key={p.number} sx={{ '&:last-child td': { border: 0 } }}>
+                    <TableCell sx={{ color: COLOR.textMuted }}>#{p.number}</TableCell>
+                    <TableCell sx={{ maxWidth: 360 }}>
+                      <Link
+                        href={p.url}
+                        target="_blank"
+                        rel="noopener"
+                        sx={{
+                          color: '#111827',
+                          fontWeight: 500,
+                          textDecoration: 'none',
+                          '&:hover': { color: COLOR.primary },
+                          display: 'block',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {p.title}
+                      </Link>
+                    </TableCell>
+                    <TableCell sx={{ color: '#111827' }}>{p.author}</TableCell>
+                    <TableCell
+                      align="right"
+                      sx={{
+                        fontWeight: 600,
+                        color: p.testCodeLines > 0 ? COLOR.success : COLOR.textMuted,
+                      }}
+                    >
+                      {formatInt(p.testCodeLines)} 行
+                    </TableCell>
+                    <TableCell align="right" sx={{ color: '#111827' }}>
+                      {formatInt(p.productionCodeLines)} 行
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        ) : (
+          <Typography variant="body2" sx={{ color: COLOR.textMuted, mt: 2 }}>
+            対象期間に PR がありません
+          </Typography>
+        )}
+      </Paper>
+
+      {/* 担当者別テスト率 */}
+      <Paper variant="outlined" sx={{ p: 3, borderColor: COLOR.border, borderRadius: 2 }}>
+        <Box mb={1}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+            担当者別テスト率
+          </Typography>
+          <Typography variant="caption" sx={{ color: COLOR.textMuted }}>
+            PR を出した著者ごとのテスト付与率 · テスト率の高い順
+          </Typography>
+        </Box>
+        {authorsTestStats.length > 0 ? (
+          <TableContainer sx={{ mt: 2 }}>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ color: COLOR.textMuted, fontWeight: 600 }}>担当者</TableCell>
+                  <TableCell sx={{ color: COLOR.textMuted, fontWeight: 600 }} align="right">
+                    テスト有 PR
+                  </TableCell>
+                  <TableCell sx={{ color: COLOR.textMuted, fontWeight: 600 }} align="right">
+                    総 PR
+                  </TableCell>
+                  <TableCell sx={{ color: COLOR.textMuted, fontWeight: 600 }} align="right">
+                    テスト率
+                  </TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {authorsTestStats.map((a) => {
+                  const pct = Math.round(a.testRate * 100)
+                  const color = pct >= 70 ? COLOR.success : pct >= 40 ? COLOR.warning : COLOR.error
+                  return (
+                    <TableRow key={a.author} sx={{ '&:last-child td': { border: 0 } }}>
+                      <TableCell sx={{ color: '#111827' }}>{a.author}</TableCell>
+                      <TableCell align="right">{formatInt(a.prsWithTests)}</TableCell>
+                      <TableCell align="right" sx={{ color: COLOR.textMuted }}>
+                        {formatInt(a.totalPrs)}
+                      </TableCell>
+                      <TableCell align="right">
+                        <Chip
+                          label={`${pct}%`}
+                          size="small"
+                          sx={{
+                            bgcolor: `${color}14`,
+                            color,
+                            fontWeight: 700,
+                            height: 22,
+                            fontSize: 11,
+                          }}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        ) : (
+          <Typography variant="body2" sx={{ color: COLOR.textMuted, mt: 2 }}>
+            データなし
+          </Typography>
+        )}
+      </Paper>
 
       {/* 失敗した PR と理由 */}
       {ciMetrics.failingPrs.length > 0 && (

@@ -12,6 +12,7 @@ import { PrSizeSection, PrSizeSprintPoint } from './pr_size_section'
 import { ReviewTimeSection, ReviewTimeSprintPoint } from './review_time_section'
 import { OpenPrSection } from './open_pr_section'
 import { COLOR, DeltaBadge, formatHours, formatInt, KpiCard } from './shared'
+import { ReviewTestCrosstab } from '../../domain/services/review_test_crosstab'
 
 type SubTab = 'lead_time' | 'pr_size' | 'review_time' | 'open_pr'
 type Scope = 'sprint' | 'all'
@@ -21,11 +22,20 @@ interface Props {
   prSizes: PrSizes
   reviewTimes: ReviewTimes
   openPrs: OpenPrs
+  reviewTestCrosstab?: ReviewTestCrosstab | null
   printAll?: boolean
   tabsNav?: React.ReactNode
 }
 
-export const FlowTab: React.FC<Props> = ({ readTimes, prSizes, reviewTimes, openPrs, printAll, tabsNav }) => {
+export const FlowTab: React.FC<Props> = ({
+  readTimes,
+  prSizes,
+  reviewTimes,
+  openPrs,
+  reviewTestCrosstab,
+  printAll,
+  tabsNav,
+}) => {
   const { current, previous, all } = useSprint()
   const [sub, setSub] = useState<SubTab>('lead_time')
   const [scope, setScope] = useState<Scope>('sprint')
@@ -177,6 +187,7 @@ export const FlowTab: React.FC<Props> = ({ readTimes, prSizes, reviewTimes, open
             previous={sectionRvPrev}
             sprintSeries={reviewSeries}
             openPrs={openPrs}
+            crosstab={reviewTestCrosstab}
           />
         )
       case 'open_pr':
