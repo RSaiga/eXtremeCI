@@ -11,6 +11,8 @@ export interface PrDetailData {
   closed_at: string | null
   merged_at: string | null
   html_url: string
+  base_ref: string // マージ先ブランチ名（baseRefName）
+  default_branch: string // 当該リポジトリのデフォルトブランチ名（自動検出）
   additions: number
   deletions: number
   changed_files: number
@@ -35,13 +37,19 @@ export interface ReviewData {
 const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000
 
 // 暴走防止: 90日以内に数千件PRがあるリポジトリでも上限を設ける
-const CLOSED_PR_PAGE_SIZE = 100
-const MAX_CLOSED_PR_PAGES = 20 // = 最大 2000件
+// closed クエリは PR ごとに commits/contexts/reviews を first:100 で引くため、
+// 1リクエストあたりの PR 件数を増やすとノード数が急増し GitHub 側が 504 でタイムアウトする。
+// ページネーションのループで総件数は担保しつつ、1リクエストは軽くしておく。
+const CLOSED_PR_PAGE_SIZE = 25
+const MAX_CLOSED_PR_PAGES = 20 // = 最大 500件
 const OPEN_PR_PAGE_SIZE = 100
 
 const CLOSED_PRS_QUERY = `
 query($owner: String!, $repo: String!, $cursor: String) {
   repository(owner: $owner, name: $repo) {
+    defaultBranchRef {
+      name
+    }
     pullRequests(last: ${CLOSED_PR_PAGE_SIZE}, states: [CLOSED, MERGED], before: $cursor) {
       pageInfo {
         hasPreviousPage
@@ -58,6 +66,7 @@ query($owner: String!, $repo: String!, $cursor: String) {
         closedAt
         mergedAt
         url
+        baseRefName
         additions
         deletions
         changedFiles
@@ -113,6 +122,9 @@ query($owner: String!, $repo: String!, $cursor: String) {
 const OPEN_PRS_QUERY = `
 query($owner: String!, $repo: String!) {
   repository(owner: $owner, name: $repo) {
+    defaultBranchRef {
+      name
+    }
     pullRequests(last: ${OPEN_PR_PAGE_SIZE}, states: [OPEN]) {
       nodes {
         number
@@ -125,6 +137,7 @@ query($owner: String!, $repo: String!) {
         closedAt
         mergedAt
         url
+        baseRefName
         additions
         deletions
         changedFiles
@@ -180,6 +193,7 @@ interface GraphQLPrNode {
   closedAt: string | null
   mergedAt: string | null
   url: string
+  baseRefName: string
   additions: number
   deletions: number
   changedFiles: number
@@ -226,6 +240,7 @@ interface GraphQLPrNode {
 
 interface ClosedPrsResponse {
   repository: {
+    defaultBranchRef: { name: string } | null
     pullRequests: {
       pageInfo: {
         hasPreviousPage: boolean
@@ -238,6 +253,7 @@ interface ClosedPrsResponse {
 
 interface OpenPrsResponse {
   repository: {
+    defaultBranchRef: { name: string } | null
     pullRequests: {
       nodes: GraphQLPrNode[]
     }
@@ -294,7 +310,7 @@ function mapCiStatus(state?: string | null): 'success' | 'failure' | 'pending' |
   }
 }
 
-function transformPrNode(node: GraphQLPrNode): PrDetailData {
+function transformPrNode(node: GraphQLPrNode, defaultBranch: string): PrDetailData {
   const firstCommit = node.commits?.nodes?.[0]
   // CI ステータスは ciCommit（last: 1 のエイリアス）優先、なければ openPrs 経路で使う commits の末尾から
   const ciStatusCommit = node.ciCommit?.nodes?.[0] ?? node.commits?.nodes?.[node.commits.nodes.length - 1]
@@ -311,6 +327,8 @@ function transformPrNode(node: GraphQLPrNode): PrDetailData {
     closed_at: node.closedAt,
     merged_at: node.mergedAt,
     html_url: node.url,
+    base_ref: node.baseRefName,
+    default_branch: defaultBranch,
     additions: node.additions,
     deletions: node.deletions,
     changed_files: node.changedFiles,
@@ -386,12 +404,14 @@ class GitHubPrDataCache {
       console.error(`Failed to fetch open PRs for ${owner}/${repo}:`, openResult.reason)
     }
 
-    const closedNodes = closedResult.status === 'fulfilled' ? closedResult.value : []
-    const openNodes = openResult.status === 'fulfilled' ? openResult.value : []
+    const closed = closedResult.status === 'fulfilled' ? closedResult.value : { nodes: [], defaultBranch: '' }
+    const open = openResult.status === 'fulfilled' ? openResult.value : { nodes: [], defaultBranch: '' }
+    // デフォルトブランチはリポジトリ単位で一意。closed 優先、無ければ open から。
+    const defaultBranch = closed.defaultBranch || open.defaultBranch || ''
 
     const entry: PrCacheEntry = {
-      closedPrs: closedNodes.map(transformPrNode),
-      openPrs: openNodes.map(transformPrNode),
+      closedPrs: closed.nodes.map((n) => transformPrNode(n, defaultBranch)),
+      openPrs: open.nodes.map((n) => transformPrNode(n, defaultBranch)),
       lastFetch: Date.now(),
     }
     this.entries.set(key, entry)
@@ -401,10 +421,14 @@ class GitHubPrDataCache {
     return entry
   }
 
-  private async fetchClosedPrs(owner: string, repo: string): Promise<GraphQLPrNode[]> {
+  private async fetchClosedPrs(
+    owner: string,
+    repo: string,
+  ): Promise<{ nodes: GraphQLPrNode[]; defaultBranch: string }> {
     const collected: GraphQLPrNode[] = []
     const cutoff = Date.now() - NINETY_DAYS_MS
     let cursor: string | null = null
+    let defaultBranch = ''
 
     for (let page = 0; page < MAX_CLOSED_PR_PAGES; page += 1) {
       // eslint-disable-next-line no-await-in-loop -- backward cursor pagination is inherently sequential
@@ -413,6 +437,7 @@ class GitHubPrDataCache {
         repo,
         cursor,
       })
+      defaultBranch = response.repository.defaultBranchRef?.name || defaultBranch
       const { nodes, pageInfo } = response.repository.pullRequests
       if (nodes.length === 0) break
       collected.push(...nodes)
@@ -423,15 +448,18 @@ class GitHubPrDataCache {
       if (!pageInfo.hasPreviousPage || !pageInfo.startCursor) break
       cursor = pageInfo.startCursor
     }
-    return collected
+    return { nodes: collected, defaultBranch }
   }
 
-  private async fetchOpenPrs(owner: string, repo: string): Promise<GraphQLPrNode[]> {
+  private async fetchOpenPrs(owner: string, repo: string): Promise<{ nodes: GraphQLPrNode[]; defaultBranch: string }> {
     const response = await octokit.graphql<OpenPrsResponse>(OPEN_PRS_QUERY, {
       owner,
       repo,
     })
-    return response.repository.pullRequests.nodes
+    return {
+      nodes: response.repository.pullRequests.nodes,
+      defaultBranch: response.repository.defaultBranchRef?.name || '',
+    }
   }
 
   clearCache(owner?: string, repo?: string): void {

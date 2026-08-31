@@ -14,11 +14,13 @@ import { ReviewNetwork } from '../../models/review_network/review_network'
 import { Contributor } from '../../models/contributor/contributor'
 import { Contributors } from '../../models/contributor/contributors'
 import { isExcludedReviewer } from '../../../shared/excluded_reviewers'
+import { isBotAuthor, isEmptyDiff, isReleasePr } from '../../../shared/pr_classification'
 import { TeamMetrics } from '../../models/team/team_metrics'
 import { TeamService } from '../team/team_service'
 
 export interface DashboardData {
   readTimes: ReadTimes
+  doraReadTimes: ReadTimes // DORA 用（release PR を含むリードタイム）
   prSizes: PrSizes
   reviewTimes: ReviewTimes
   openPrs: OpenPrs
@@ -34,13 +36,17 @@ const NINETY_DAYS_AGO = () => {
   return date
 }
 
-function buildReadTimes(closedPrs: PrDetailData[]): ReadTimes {
+function buildReadTimes(closedPrs: PrDetailData[], opts?: { includeReleasePrs?: boolean }): ReadTimes {
   const ninetyDaysAgo = NINETY_DAYS_AGO()
   const readTimes: ReadTime[] = []
 
   for (const pr of closedPrs) {
     const closedAt = new Date(pr.merged_at || pr.closed_at || '')
     if (closedAt.getTime() < ninetyDaysAgo.getTime()) continue
+    // bot作者・空差分は母数から除外。ただし DORA 用途（includeReleasePrs）では
+    // release PR（作成者=github-actions 等）はリードタイムに残す。
+    const isBotNonRelease = isBotAuthor(pr.user?.login) && !(opts?.includeReleasePrs && isReleasePr(pr.title))
+    if (isBotNonRelease || isEmptyDiff(pr)) continue
     if (!pr.firstCommitDate) continue
 
     const timeMinutes = (closedAt.getTime() - pr.firstCommitDate.getTime()) / (60 * 1000)
@@ -59,6 +65,7 @@ function buildPrSizes(closedPrs: PrDetailData[]): PrSizes {
   for (const pr of closedPrs) {
     const closedAt = new Date(pr.merged_at || pr.closed_at || '')
     if (closedAt.getTime() < ninetyDaysAgo.getTime()) continue
+    if (isBotAuthor(pr.user?.login) || isEmptyDiff(pr)) continue // bot作者・空差分は母数から除外
 
     prSizes.push(
       new PrSize(
@@ -85,6 +92,7 @@ function buildReviewTimes(closedPrs: PrDetailData[]): ReviewTimes {
   for (const pr of closedPrs) {
     const createdAt = new Date(pr.created_at)
     if (createdAt.getTime() < ninetyDaysAgo.getTime()) continue
+    if (isBotAuthor(pr.user?.login) || isEmptyDiff(pr)) continue // bot作者・空差分はレビュー母数から除外
 
     const author = pr.user?.login || 'unknown'
 
@@ -130,6 +138,10 @@ function buildOpenPrs(openPrs: PrDetailData[]): OpenPrs {
   const result: OpenPr[] = []
 
   for (const pr of openPrs) {
+    // bot(dependabot/github-actions/snyk-bot 等)の自動PRは人のWIPではないため、
+    // オープン数・滞留(stale/old)・平均滞留日数・最長未レビュー待ちの母数から除外する。
+    if (isBotAuthor(pr.user?.login)) continue
+
     const validReviews = pr.reviews
       .filter((r) => r.state !== 'PENDING' && r.state !== 'DISMISSED')
       .filter((r) => !isExcludedReviewer(r.user?.login))
@@ -178,6 +190,8 @@ export function buildReviewNetwork(closedPrs: PrDetailData[]): ReviewNetwork {
     const closedAt = new Date(pr.merged_at || pr.closed_at || '')
     if (closedAt.getTime() < ninetyDaysAgo.getTime()) continue
 
+    if (isBotAuthor(pr.user?.login) || isEmptyDiff(pr)) continue // bot作者・空差分はレビューネットワークから除外
+
     const author = pr.user?.login || 'unknown'
 
     // 各レビュアーをカウント（重複排除: 1PRにつき1レビュアー1回）
@@ -206,9 +220,10 @@ export function buildReviewNetwork(closedPrs: PrDetailData[]): ReviewNetwork {
 }
 
 function buildContributors(stats: ContributorStats[], dailyCommits: DailyCommitData[]): Contributors {
-  const contributors = stats.map(
-    (s) => new Contributor(s.author, s.commitCount, s.additions, s.deletions, s.firstCommitDate, s.lastCommitDate),
-  )
+  // bot（github-actions 等）の直接コミットを人数・占有率・バス係数の母数から除外
+  const contributors = stats
+    .filter((s) => !isBotAuthor(s.author))
+    .map((s) => new Contributor(s.author, s.commitCount, s.additions, s.deletions, s.firstCommitDate, s.lastCommitDate))
   return new Contributors(contributors, dailyCommits)
 }
 
@@ -273,6 +288,7 @@ export const DashboardService = {
 
     // 取得したデータから各ドメインモデルを構築（メモリ内で高速）
     const readTimes = buildReadTimes(closedPrs)
+    const doraReadTimes = buildReadTimes(closedPrs, { includeReleasePrs: true })
     const prSizes = buildPrSizes(closedPrs)
     const reviewTimes = buildReviewTimes(closedPrs)
     const openPrs = buildOpenPrs(openPrsData)
@@ -282,6 +298,7 @@ export const DashboardService = {
 
     return {
       readTimes,
+      doraReadTimes,
       prSizes,
       reviewTimes,
       openPrs,

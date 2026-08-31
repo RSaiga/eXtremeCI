@@ -7,6 +7,7 @@ import {
   CIMetrics,
   RefactoringMetrics,
   PrWithQualityInfo,
+  AuthorTestStats,
   WeeklyTestData,
   WeeklyCIData,
   WeeklyRefactoringData,
@@ -19,8 +20,14 @@ import {
   determineFlowHealth,
 } from '../../models/quality_sustainability/quality_sustainability'
 
-// ファイル一覧のキャッシュ（repo単位でキー化）
-const prFilesCache = new Map<string, string[]>()
+interface PrFileChange {
+  filename: string
+  additions: number
+  deletions: number
+}
+
+// ファイル変更情報のキャッシュ（repo単位でキー化）
+const prFilesCache = new Map<string, PrFileChange[]>()
 
 function getWeekStart(date: Date): Date {
   const d = new Date(date)
@@ -38,7 +45,7 @@ function formatWeekLabel(weekStart: Date): string {
 }
 
 function loadExtraTestPatterns(): RegExp[] {
-  const env = (process.env as Record<string, string | undefined>).VITE_TEST_FILE_PATTERNS || ''
+  const env = import.meta.env.VITE_TEST_FILE_PATTERNS || ''
   return env
     .split(',')
     .map((s) => s.trim())
@@ -57,11 +64,11 @@ function loadExtraTestPatterns(): RegExp[] {
 const EXTRA_TEST_PATTERNS = loadExtraTestPatterns()
 const ALL_TEST_PATTERNS = [...TEST_FILE_PATTERNS, ...EXTRA_TEST_PATTERNS]
 
-function isTestFile(filename: string): boolean {
+export function isTestFile(filename: string): boolean {
   return ALL_TEST_PATTERNS.some((pattern) => pattern.test(filename))
 }
 
-async function fetchPrFiles(owner: string, repo: string, prNumber: number): Promise<string[]> {
+export async function fetchPrFiles(owner: string, repo: string, prNumber: number): Promise<PrFileChange[]> {
   const cacheKey = `${owner}/${repo}#${prNumber}`
   // キャッシュチェック
   if (prFilesCache.has(cacheKey)) {
@@ -76,7 +83,13 @@ async function fetchPrFiles(owner: string, repo: string, prNumber: number): Prom
       per_page: 100,
     })
 
-    const files = response.data.map((f: { filename: string }) => f.filename)
+    const files: PrFileChange[] = response.data.map(
+      (f: { filename: string; additions: number; deletions: number }) => ({
+        filename: f.filename,
+        additions: f.additions,
+        deletions: f.deletions,
+      }),
+    )
     prFilesCache.set(cacheKey, files)
     return files
   } catch (e) {
@@ -136,6 +149,13 @@ export async function analyzeQualitySustainability(
     refactoringMetrics.inlineRefactorRate,
   )
 
+  const prsCodeBreakdown = [...prsWithQualityInfo].sort((a, b) => {
+    const at = a.mergedAt ? a.mergedAt.getTime() : 0
+    const bt = b.mergedAt ? b.mergedAt.getTime() : 0
+    return bt - at
+  })
+  const authorsTestStats = calculateAuthorsTestStats(prsWithQualityInfo)
+
   return {
     testMetrics,
     ciMetrics,
@@ -144,7 +164,27 @@ export async function analyzeQualitySustainability(
     sustainabilityGrade,
     orientation,
     orientationLabel,
+    prsCodeBreakdown,
+    authorsTestStats,
   }
+}
+
+function calculateAuthorsTestStats(prsWithInfo: PrWithQualityInfo[]): AuthorTestStats[] {
+  const authorMap = new Map<string, { withTests: number; total: number }>()
+  for (const pr of prsWithInfo) {
+    const current = authorMap.get(pr.author) || { withTests: 0, total: 0 }
+    current.total++
+    if (pr.hasTests) current.withTests++
+    authorMap.set(pr.author, current)
+  }
+  return Array.from(authorMap.entries())
+    .map(([author, stats]) => ({
+      author,
+      prsWithTests: stats.withTests,
+      totalPrs: stats.total,
+      testRate: stats.total > 0 ? stats.withTests / stats.total : 0,
+    }))
+    .sort((a, b) => b.testRate - a.testRate || b.totalPrs - a.totalPrs || a.author.localeCompare(b.author))
 }
 
 async function collectPrQualityInfo(owner: string, repo: string, prs: PrDetailData[]): Promise<PrWithQualityInfo[]> {
@@ -154,17 +194,31 @@ async function collectPrQualityInfo(owner: string, repo: string, prs: PrDetailDa
 
   return prs.map((pr, index) => {
     const files = allFiles[index]
-    const hasTests = files.some((f) => isTestFile(f))
+    let testCodeLines = 0
+    let productionCodeLines = 0
+    let hasTests = false
+    for (const f of files) {
+      const churn = f.additions + f.deletions
+      if (isTestFile(f.filename)) {
+        testCodeLines += churn
+        hasTests = true
+      } else {
+        productionCodeLines += churn
+      }
+    }
     const prType = detectPrType(pr.title, pr.labels)
     const inlineRefactor = hasInlineRefactorCommit(pr.commitHeadlines)
 
     return {
       number: pr.number,
       title: pr.title,
+      url: pr.html_url,
       author: pr.user?.login || 'unknown',
       createdAt: new Date(pr.created_at),
       mergedAt: pr.merged_at ? new Date(pr.merged_at) : null,
       hasTests,
+      testCodeLines,
+      productionCodeLines,
       prType,
       ciStatus: pr.ciStatus,
       hasInlineRefactor: inlineRefactor,
@@ -268,7 +322,7 @@ function calculateWeeklyTestTrend(prsWithInfo: PrWithQualityInfo[]): WeeklyTestD
 }
 
 function parseIgnoredChecks(): Set<string> {
-  const env = (process.env as Record<string, string | undefined>).VITE_CI_IGNORE_CHECKS || ''
+  const env = import.meta.env.VITE_CI_IGNORE_CHECKS || ''
   return new Set(
     env
       .split(',')

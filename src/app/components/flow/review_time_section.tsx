@@ -2,6 +2,7 @@ import React, { useMemo } from 'react'
 import {
   Box,
   Chip,
+  CircularProgress,
   Paper,
   Stack,
   Table,
@@ -29,6 +30,8 @@ import {
 } from 'recharts'
 import { ReviewTimes } from '../../domain/models/review_time/review_times'
 import { OpenPrs } from '../../domain/models/open_pr/open_prs'
+import { CATEGORY_LABEL, MergeCategory } from '../../shared/pr_classification'
+import { ReviewTestCrosstab } from '../../domain/services/review_test_crosstab'
 import { COLOR, DeltaBadge, formatHours, SectionHeader } from './shared'
 
 const BUCKETS = [
@@ -55,9 +58,17 @@ interface Props {
   previous: ReviewTimes
   sprintSeries: ReviewTimeSprintPoint[]
   openPrs: OpenPrs
+  crosstab?: ReviewTestCrosstab | null
 }
 
-export const ReviewTimeSection: React.FC<Props> = ({ current, previous, sprintSeries, openPrs }) => {
+// テスト無しカテゴリの表示順（実装＝リスクを最上位に）
+const CATEGORY_ORDER: MergeCategory[] = ['impl', 'dep', 'chore', 'format', 'merge', 'revert', 'release', 'bump']
+
+const pctStr = (n: number, d: number): string => (d > 0 ? `${((n / d) * 100).toFixed(0)}%` : '—')
+
+const UNSAFE_LIST_LIMIT = 25
+
+export const ReviewTimeSection: React.FC<Props> = ({ current, previous, sprintSeries, openPrs, crosstab }) => {
   const { distribution, fastRate, pendingCount } = useMemo(() => {
     const reviewed = current.reviewedPrs
     const pending = current.pendingReviewPrs.length
@@ -310,6 +321,137 @@ export const ReviewTimeSection: React.FC<Props> = ({ current, previous, sprintSe
             </ComposedChart>
           </ResponsiveContainer>
         </Box>
+      </Paper>
+
+      <Paper variant="outlined" sx={{ p: 3, borderColor: COLOR.border, borderRadius: 2 }}>
+        <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5 }}>
+          レビュー×テスト クロス集計
+        </Typography>
+        <Typography variant="caption" sx={{ color: COLOR.textMuted, display: 'block' }}>
+          全期間90日 · レビューを省いたマージが実際にテストで担保されているか（「ノーレビュー＝テスト担保型」の検証）
+        </Typography>
+
+        {!crosstab ? (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mt: 2, color: COLOR.textMuted }}>
+            <CircularProgress size={18} />
+            <Typography variant="body2">PR ごとのテスト有無を集計中…</Typography>
+          </Box>
+        ) : crosstab.noReviewMergedCount === 0 ? (
+          <Typography variant="body2" sx={{ mt: 2, color: COLOR.textMuted }}>
+            対象のノーレビューマージはありません
+          </Typography>
+        ) : (
+          <Box sx={{ mt: 2 }}>
+            <Typography variant="caption" sx={{ color: COLOR.textMuted, display: 'block', mb: 1 }}>
+              依存更新・release・revert・chore・format
+              等「テストが無くて当然の変更」と空差分を除いた、テストが期待される実装マージのみで評価
+            </Typography>
+            <Stack direction="row" spacing={4} flexWrap="wrap" useFlexGap sx={{ mb: 1.5 }}>
+              <Box>
+                <Typography variant="caption" sx={{ color: COLOR.textMuted, display: 'block' }}>
+                  実装マージ（テスト対象）
+                </Typography>
+                <Typography sx={{ fontWeight: 700, fontSize: 20 }}>{crosstab.implMergedCount} 件</Typography>
+              </Box>
+              <Box>
+                <Typography variant="caption" sx={{ color: COLOR.textMuted, display: 'block' }}>
+                  テスト有
+                </Typography>
+                <Typography sx={{ fontWeight: 700, fontSize: 20, color: COLOR.success }}>
+                  {crosstab.implWithTests} 件 ({pctStr(crosstab.implWithTests, crosstab.implMergedCount)})
+                </Typography>
+              </Box>
+              <Box>
+                <Typography variant="caption" sx={{ color: COLOR.textMuted, display: 'block' }}>
+                  テスト無し（無担保）
+                </Typography>
+                <Typography sx={{ fontWeight: 700, fontSize: 20, color: COLOR.error }}>
+                  {crosstab.implWithoutTests} 件 ({pctStr(crosstab.implWithoutTests, crosstab.implMergedCount)})
+                </Typography>
+              </Box>
+            </Stack>
+
+            <Box sx={{ display: 'flex', height: 10, borderRadius: 1, overflow: 'hidden', mb: 1.5 }}>
+              <Box sx={{ width: `${crosstab.implTestCoverageRatio * 100}%`, bgcolor: COLOR.success }} />
+              <Box sx={{ flex: 1, bgcolor: COLOR.error }} />
+            </Box>
+
+            <Typography variant="caption" sx={{ color: COLOR.textMuted, display: 'block', mb: 2 }}>
+              参考: 全ノーレビューマージ {crosstab.noReviewMergedCount} 件（テスト有 {crosstab.withTests}・無{' '}
+              {crosstab.withoutTests}）。テスト無し {crosstab.withoutTests} 件の内訳は下記で、大半はテスト不要な変更。
+            </Typography>
+
+            <Typography variant="caption" sx={{ color: COLOR.textMuted, display: 'block', mb: 1 }}>
+              テスト無しの内訳（カテゴリ別 · 実装以外はテスト不要とみなし除外）
+            </Typography>
+            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mb: 2 }}>
+              {CATEGORY_ORDER.filter((c) => crosstab.testlessCategoryCounts[c] > 0).map((c) => (
+                <Chip
+                  key={c}
+                  size="small"
+                  label={`${CATEGORY_LABEL[c]} ${crosstab.testlessCategoryCounts[c]}`}
+                  variant="outlined"
+                  sx={{
+                    borderColor: c === 'impl' ? COLOR.error : COLOR.border,
+                    color: c === 'impl' ? COLOR.error : COLOR.textMuted,
+                    fontWeight: c === 'impl' ? 700 : 500,
+                  }}
+                />
+              ))}
+            </Stack>
+
+            <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+              無担保な実装マージ（レビュー無し × テスト無し × 実装PR）: {crosstab.unsafeImplPrs.length} 件
+            </Typography>
+            <Typography variant="caption" sx={{ color: COLOR.textMuted, display: 'block', mb: 1 }}>
+              空差分（0ファイル）の再マージは除外済み。プロダクション変更行数の多い順
+            </Typography>
+            {crosstab.unsafeImplPrs.length > 0 && (
+              <TableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell sx={{ color: COLOR.textMuted, fontWeight: 600 }}>PR</TableCell>
+                      <TableCell sx={{ color: COLOR.textMuted, fontWeight: 600 }}>repo</TableCell>
+                      <TableCell align="right" sx={{ color: COLOR.textMuted, fontWeight: 600 }}>
+                        prod 行
+                      </TableCell>
+                      <TableCell sx={{ color: COLOR.textMuted, fontWeight: 600 }}>タイトル</TableCell>
+                      <TableCell sx={{ color: COLOR.textMuted, fontWeight: 600 }}>作成者</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {crosstab.unsafeImplPrs.slice(0, UNSAFE_LIST_LIMIT).map((pr) => (
+                      <TableRow key={`${pr.repo}#${pr.number}`} sx={{ '&:last-child td': { border: 0 } }}>
+                        <TableCell sx={{ fontWeight: 500 }}>#{pr.number}</TableCell>
+                        <TableCell sx={{ color: COLOR.textMuted, fontSize: 12 }}>{pr.repo}</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 600 }}>
+                          {pr.productionLines.toLocaleString()}
+                        </TableCell>
+                        <TableCell
+                          sx={{
+                            maxWidth: 360,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {pr.title}
+                        </TableCell>
+                        <TableCell sx={{ color: COLOR.textMuted }}>{pr.author}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+            {crosstab.unsafeImplPrs.length > UNSAFE_LIST_LIMIT && (
+              <Typography variant="caption" sx={{ color: COLOR.textMuted, display: 'block', mt: 1 }}>
+                ほか {crosstab.unsafeImplPrs.length - UNSAFE_LIST_LIMIT} 件
+              </Typography>
+            )}
+          </Box>
+        )}
       </Paper>
 
       {current.noReviewMergedPrs().length > 0 && (

@@ -56,7 +56,7 @@ export const OpenPrSection: React.FC<Props> = ({ openPrs }) => {
       <SectionHeader
         overline="OPEN PRS"
         title="オープン中の PR"
-        desc="現在マージされていない PR · 古い PR が多いと WIP 過多でフロー効率が下がる"
+        desc="現在マージされていない PR · 古い PR が多いと WIP 過多でフロー効率が下がる（bot の自動PRは除外）"
       />
 
       <Box

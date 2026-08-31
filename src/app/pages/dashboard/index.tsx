@@ -18,6 +18,7 @@ import { TeamMetrics } from '../../domain/models/team/team_metrics'
 import { PrDetailData } from '../../infra/github/pr_data'
 import { useActiveRepo } from '../../shared/repos/context'
 import { repoKey } from '../../shared/repos/config'
+import { analyzeReviewTestCrosstab, ReviewTestCrosstab } from '../../domain/services/review_test_crosstab'
 
 type TabKey = 'flow' | 'quality' | 'team' | 'dora'
 
@@ -40,6 +41,7 @@ export const DashboardPage: React.FC = () => {
   const { current: currentSprint } = useSprint()
   const [loading, setLoading] = useState(false)
   const [readTimes, setReadTimes] = useState<ReadTimes>(new ReadTimes([]))
+  const [doraReadTimes, setDoraReadTimes] = useState<ReadTimes>(new ReadTimes([]))
   const [prSizes, setPrSizes] = useState<PrSizes>(new PrSizes([]))
   const [reviewTimes, setReviewTimes] = useState<ReviewTimes>(new ReviewTimes([]))
   const [openPrs, setOpenPrs] = useState<OpenPrs>(new OpenPrs([]))
@@ -47,6 +49,7 @@ export const DashboardPage: React.FC = () => {
   const [reviewNetwork, setReviewNetwork] = useState<ReviewNetwork>(new ReviewNetwork([]))
   const [teamMetrics, setTeamMetrics] = useState<TeamMetrics | null>(null)
   const [closedPrs, setClosedPrs] = useState<PrDetailData[]>([])
+  const [reviewTestCrosstab, setReviewTestCrosstab] = useState<ReviewTestCrosstab | null>(null)
   const [activeTab, setActiveTab] = useState<TabKey>('flow')
   const [printing, setPrinting] = useState(false)
 
@@ -58,6 +61,7 @@ export const DashboardPage: React.FC = () => {
         const data = await DashboardService.fetchAll(selectedRepos)
         if (!cancelled) {
           setReadTimes(data.readTimes)
+          setDoraReadTimes(data.doraReadTimes)
           setPrSizes(data.prSizes)
           setReviewTimes(data.reviewTimes)
           setOpenPrs(data.openPrs)
@@ -73,6 +77,22 @@ export const DashboardPage: React.FC = () => {
       }
     }
     run()
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeRepo])
+
+  // レビュー×テストのクロス集計は PR ごとに listFiles を引くため重い。
+  // メインのダッシュボード取得をブロックしないよう、独立して非同期にロードする。
+  useEffect(() => {
+    let cancelled = false
+    setReviewTestCrosstab(null)
+    analyzeReviewTestCrosstab(selectedRepos)
+      .then((result) => {
+        if (!cancelled) setReviewTestCrosstab(result)
+      })
+      .catch((e) => console.error('Failed to fetch review/test crosstab:', e))
     return () => {
       cancelled = true
     }
@@ -203,6 +223,7 @@ export const DashboardPage: React.FC = () => {
               prSizes={prSizes}
               reviewTimes={reviewTimes}
               openPrs={openPrs}
+              reviewTestCrosstab={reviewTestCrosstab}
               printAll={printing}
               tabsNav={printing ? renderTabsNav('flow') : undefined}
             />
@@ -236,7 +257,7 @@ export const DashboardPage: React.FC = () => {
             className={printing ? 'print-page-break' : undefined}
           >
             <DoraTab
-              readTimes={readTimes}
+              readTimes={doraReadTimes}
               closedPrs={closedPrs}
               tabsNav={printing ? renderTabsNav('dora') : undefined}
             />
